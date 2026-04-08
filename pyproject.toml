@@ -1,0 +1,75 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "engram"
+version = "1.0.0"
+description = "The AI memory layer that never forgets."
+authors = [{name = "Tushae Thomas"}]
+license = {text = "MIT"}
+requires-python = ">=3.9"
+readme = "README.md"
+keywords = ["ai", "memory", "mcp", "llm", "chromadb", "claude"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "chromadb>=0.4.0",
+    "pyyaml>=6.0",
+    "watchdog>=3.0.0",
+    "questionary>=2.0.0",
+    "typer>=0.9.0",
+    "rich>=13.0.0",
+]
+
+[project.optional-dependencies]
+faiss = ["faiss-cpu>=1.7.0"]
+sqlitevec = ["sqlite-vec>=0.1.0"]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "black>=23.0",
+    "ruff>=0.1.0",
+    "pre-commit>=3.0",
+]
+all = ["faiss-cpu>=1.7.0", "sqlite-vec>=0.1.0"]
+
+[project.scripts]
+engram = "engram.cli:app"
+
+[project.urls]
+Repository = "https://github.com/TushaeBXN/engram"
+Issues = "https://github.com/TushaeBXN/engram/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["engram*"]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+ignore = ["E501"]
+
+[tool.black]
+line-length = 100
+target-version = ["py39"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["engram"]
+omit = ["tests/*", "benchmarks/*", "examples/*"]
