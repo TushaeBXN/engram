@@ -332,14 +332,14 @@ class EngramMCPServer:
 
     def __init__(self) -> None:
         from engram.config import load_config
-        from engram.palace import Palace
+        from engram.chateau import Chateau
         from engram.backends import get_backend
         from engram.searcher import Searcher
         from engram.layers import LayerStack
         from engram.knowledge_graph import KnowledgeGraph
 
         self.cfg = load_config()
-        self.palace = Palace()
+        self.palace = Chateau()
         self.backend = get_backend(self.cfg.get("vector_backend", "chromadb"))
         self.searcher = Searcher(self.backend, self.palace, self.cfg)
         self.stack = LayerStack(self.palace, self.searcher, self.cfg)
@@ -361,7 +361,7 @@ class EngramMCPServer:
         return self.searcher.search(query, n=n, wing=wing, room=room, no_decay=no_decay)
 
     def _tool_engram_add_memory(self, content, wing="default", room="general", hall="facts", pinned=False):
-        from engram.palace import Drawer
+        from engram.chateau import Drawer
         from engram.shorthand import compress
         drawer = Drawer(content=compress(content), wing=wing, room=room, hall=hall, pinned=pinned)
         self.palace.save_drawer(drawer)

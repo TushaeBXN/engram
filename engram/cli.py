@@ -15,7 +15,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich import print as rprint
 
-from engram.config import load_config, get_palace_path
+from engram.config import load_config, get_chateau_path
 
 app = typer.Typer(
     name="engram",
@@ -31,8 +31,8 @@ console = Console()
 # ---------------------------------------------------------------------------
 
 def _palace():
-    from engram.palace import Palace
-    return Palace()
+    from engram.chateau import Chateau
+    return Chateau()
 
 
 def _backend(cfg=None):
@@ -93,7 +93,7 @@ def cmd_mine(
         miner = Miner(palace, backend, cfg)
         drawers = []
         for doc in docs:
-            from engram.palace import Drawer
+            from engram.chateau import Drawer
             d = Drawer(
                 content=doc["content"][:4000],
                 wing=wing,
@@ -215,7 +215,7 @@ def cmd_compress(
 ):
     """Rebuild ES closets for wings/rooms."""
     from engram.shorthand import compress as es_compress
-    from engram.palace import Closet, HALL_TYPES
+    from engram.chateau import Closet, HALL_TYPES
     palace = _palace()
 
     wings_to_process = [w.name for w in palace.list_wings()] if not wing else [wing]
@@ -392,7 +392,7 @@ def cmd_status():
     table.add_row("Drawers", str(stats["drawers"]))
     table.add_row("Closets", str(stats["closets"]))
     table.add_row("Backend", cfg.get("vector_backend", "chromadb"))
-    table.add_row("Palace path", str(get_palace_path()))
+    table.add_row("Palace path", str(get_chateau_path()))
     console.print(table)
 
 

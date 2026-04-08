@@ -22,7 +22,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from engram.palace import Palace, HALL_TYPES
+from engram.chateau import Chateau, HALL_TYPES
 from engram.searcher import Searcher
 from engram.shorthand import compress, decompress
 from engram.config import get_identity, ENGRAM_DIR, load_config
@@ -40,7 +40,7 @@ class LayerStack:
     """
 
     def __init__(
-        self, palace: Palace, searcher: Searcher, config: Optional[dict] = None
+        self, palace: Chateau, searcher: Searcher, config: Optional[dict] = None
     ) -> None:
         self.palace = palace
         self.searcher = searcher
@@ -148,10 +148,10 @@ class LayerStack:
 
 
 if __name__ == "__main__":
-    from engram.palace import Palace
+    from engram.chateau import Chateau
     from engram.backends import get_backend
     cfg = load_config()
-    palace = Palace()
+    palace = Chateau()
     backend = get_backend(cfg["vector_backend"])
     searcher = Searcher(backend, palace, cfg)
     stack = LayerStack(palace, searcher, cfg)

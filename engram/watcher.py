@@ -29,7 +29,7 @@ class EngramWatcher:
         path:         Directory to watch.
         wing:         Wing to assign mined drawers to.
         mode:         ``"files"`` or ``"convos"``.
-        palace_path:  Override default palace path.
+        chateau_path:  Override default palace path.
         config:       Override config dict.
     """
 
@@ -38,14 +38,14 @@ class EngramWatcher:
         path: str | Path,
         wing: Optional[str] = None,
         mode: str = "files",
-        palace_path: Optional[Path] = None,
+        chateau_path: Optional[Path] = None,
         config: Optional[dict] = None,
     ) -> None:
         self.path = Path(path).expanduser()
         self.wing = wing or "default"
         self.mode = mode
         self.config = config or load_config()
-        self._palace_path = palace_path
+        self._chateau_path = chateau_path
         self._observer = None
         self._running = False
 
@@ -55,14 +55,14 @@ class EngramWatcher:
         """Start watching (blocking).  Press Ctrl-C to stop."""
         from watchdog.observers import Observer  # type: ignore
         from watchdog.events import FileSystemEventHandler  # type: ignore
-        from engram.palace import Palace
+        from engram.chateau import Chateau
         from engram.backends import get_backend
         from engram.miner import Miner
         from rich.console import Console
         from rich import print as rprint
 
         console = Console()
-        palace = Palace(self._palace_path)
+        palace = Chateau(self._chateau_path)
         backend = get_backend(self.config.get("vector_backend", "chromadb"))
         miner = Miner(palace, backend, self.config)
 

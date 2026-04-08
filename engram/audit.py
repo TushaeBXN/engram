@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional
 
-from engram.palace import Palace, HALL_TYPES
+from engram.chateau import Chateau, HALL_TYPES
 from engram.knowledge_graph import KnowledgeGraph
 
 
@@ -66,7 +66,7 @@ class Auditor:
         kg:      The active KnowledgeGraph.
     """
 
-    def __init__(self, palace: Palace, kg: KnowledgeGraph) -> None:
+    def __init__(self, palace: Chateau, kg: KnowledgeGraph) -> None:
         self.palace = palace
         self.kg = kg
 
@@ -161,7 +161,7 @@ class Auditor:
     def _build_closets(self, wing: str, room: str) -> None:
         """Build ES closets for a room from its drawers."""
         from engram.shorthand import compress
-        from engram.palace import Closet
+        from engram.chateau import Closet
 
         for hall in HALL_TYPES:
             drawers = list(self.palace.iter_drawers(wing=wing, room=room, hall=hall))
@@ -207,10 +207,10 @@ def format_report(report: AuditReport) -> str:
 
 if __name__ == "__main__":
     from rich.console import Console
-    from engram.palace import Palace
+    from engram.chateau import Chateau
     from engram.knowledge_graph import KnowledgeGraph
 
-    palace = Palace()
+    palace = Chateau()
     kg = KnowledgeGraph()
     auditor = Auditor(palace, kg)
     report = auditor.run()

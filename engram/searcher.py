@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from engram.backends.base import VectorBackend
-from engram.palace import Palace, Drawer
+from engram.chateau import Chateau, Drawer
 from engram.config import load_config
 
 
@@ -35,7 +35,7 @@ class Searcher:
     def __init__(
         self,
         backend: VectorBackend,
-        palace: Palace,
+        palace: Chateau,
         config: Optional[dict] = None,
     ) -> None:
         self.backend = backend
@@ -149,10 +149,10 @@ def _age_days(timestamp: str) -> float:
 
 
 if __name__ == "__main__":
-    from engram.palace import Palace
+    from engram.chateau import Chateau
     from engram.backends import get_backend
     cfg = load_config()
-    palace = Palace()
+    palace = Chateau()
     backend = get_backend(cfg["vector_backend"])
     searcher = Searcher(backend, palace, cfg)
     print("Searcher ready.  Usage: searcher.search('your query')")

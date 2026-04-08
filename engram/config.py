@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 DEFAULT_CONFIG: dict[str, Any] = {
-    "palace_path": "~/.engram/palace",
+    "chateau_path": "~/.engram/chateau",
     "vector_backend": "chromadb",
     "decay_factor": 0.005,
     "decay_max_days": 90,
@@ -24,7 +24,7 @@ IDENTITY_PATH = ENGRAM_DIR / "identity.txt"
 def ensure_engram_dir() -> None:
     """Create ~/.engram and its subdirectories if they don't exist."""
     ENGRAM_DIR.mkdir(parents=True, exist_ok=True)
-    (ENGRAM_DIR / "palace").mkdir(exist_ok=True)
+    (ENGRAM_DIR / "chateau").mkdir(exist_ok=True)
     (ENGRAM_DIR / "agents").mkdir(exist_ok=True)
     (ENGRAM_DIR / "chroma_db").mkdir(exist_ok=True)
 
@@ -66,9 +66,9 @@ def save_wing_config(wc: dict[str, Any]) -> None:
         json.dump(wc, f, indent=2)
 
 
-def get_palace_path() -> Path:
+def get_chateau_path() -> Path:
     cfg = load_config()
-    return Path(cfg["palace_path"]).expanduser()
+    return Path(cfg["chateau_path"]).expanduser()
 
 
 def get_identity() -> str:

@@ -1,4 +1,4 @@
-"""Tests for engram.palace — the château data model."""
+"""Tests for engram.chateau — the château data model."""
 
 import json
 import tempfile
@@ -6,12 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from engram.palace import Palace, Wing, Room, Hall, Drawer, Closet, Tunnel, HALL_TYPES
+from engram.chateau import Chateau, Wing, Room, Hall, Drawer, Closet, Tunnel, HALL_TYPES
 
 
 @pytest.fixture
 def palace(tmp_path):
-    return Palace(palace_path=tmp_path)
+    return Chateau(chateau_path=tmp_path)
 
 
 # ---------------------------------------------------------------------------

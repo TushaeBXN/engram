@@ -11,7 +11,7 @@ hierarchy:
             │     └── Drawer  (verbatim original — never summarised)
             └── Tunnel  (cross-wing link when a room spans wings)
 
-All data lives under ~/.engram/palace/ as nested directories + JSON
+All data lives under ~/.engram/chateau/ as nested directories + JSON
 files. Nothing is stored in a database — the filesystem IS the model.
 """
 
@@ -24,7 +24,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator, Optional
 
-from engram.config import get_palace_path
+from engram.config import get_chateau_path
 
 # ---------------------------------------------------------------------------
 # Hall types recognised by the château
@@ -162,13 +162,13 @@ class Wing:
 # Palace — the château itself
 # ---------------------------------------------------------------------------
 
-class Palace:
+class Chateau:
     """Manages the full château: reads/writes Wings, Rooms, Drawers, and
-    Closets to/from the filesystem under palace_path.
+    Closets to/from the filesystem under chateau_path.
 
     Directory layout::
 
-        palace_path/
+        chateau_path/
           {wing}/
             wing.json
             {room}/
@@ -179,8 +179,8 @@ class Palace:
             tunnels.json           ← cross-wing tunnel records
     """
 
-    def __init__(self, palace_path: Optional[Path] = None) -> None:
-        self.path: Path = (palace_path or get_palace_path()).expanduser()
+    def __init__(self, chateau_path: Optional[Path] = None) -> None:
+        self.path: Path = (chateau_path or get_chateau_path()).expanduser()
         self.path.mkdir(parents=True, exist_ok=True)
 
     # ------------------------------------------------------------------
@@ -410,6 +410,6 @@ class Palace:
 
 
 if __name__ == "__main__":
-    palace = Palace()
-    stats = palace.stats()
+    chateau = Chateau()
+    stats = chateau.stats()
     print("Château stats:", stats)

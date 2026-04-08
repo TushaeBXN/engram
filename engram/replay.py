@@ -20,7 +20,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
 
-from engram.palace import Palace, Drawer
+from engram.chateau import Chateau, Drawer
 from engram.shorthand import decompress
 
 
@@ -31,7 +31,7 @@ class Replayer:
         palace: The active Palace.
     """
 
-    def __init__(self, palace: Palace) -> None:
+    def __init__(self, palace: Chateau) -> None:
         self.palace = palace
 
     # ------------------------------------------------------------------
@@ -131,6 +131,6 @@ if __name__ == "__main__":
     import sys
     room = sys.argv[1] if len(sys.argv) > 1 else "default"
     wing = sys.argv[2] if len(sys.argv) > 2 else None
-    palace = Palace()
+    palace = Chateau()
     replayer = Replayer(palace)
     print(replayer.replay(room, wing=wing))

@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 from datetime import datetime, timezone, timedelta
 
-from engram.palace import Palace, Drawer
+from engram.chateau import Chateau, Drawer
 from engram.searcher import Searcher, _age_days, _build_where
 
 
@@ -15,7 +15,7 @@ from engram.searcher import Searcher, _age_days, _build_where
 
 @pytest.fixture
 def palace(tmp_path):
-    return Palace(palace_path=tmp_path)
+    return Chateau(chateau_path=tmp_path)
 
 
 @pytest.fixture

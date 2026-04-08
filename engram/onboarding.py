@@ -111,8 +111,8 @@ class Onboarder:
         self.cfg["default_wing"] = wing
 
         # Create wing in palace
-        from engram.palace import Palace
-        palace = Palace()
+        from engram.chateau import Chateau
+        palace = Chateau()
         palace.create_wing(wing, description=f"Initialised via engram init")
         console.print(f"  [green]✓[/green] Wing '[bold]{wing}[/bold]' created.")
 
@@ -152,10 +152,10 @@ class Onboarder:
             answer = "n"
 
         if answer == "y":
-            from engram.palace import Palace
+            from engram.chateau import Chateau
             from engram.backends import get_backend
             from engram.miner import Miner
-            palace = Palace()
+            palace = Chateau()
             backend = get_backend(self.cfg.get("vector_backend", "chromadb"))
             miner = Miner(palace, backend, self.cfg)
             wing = self.cfg.get("default_wing", "default")

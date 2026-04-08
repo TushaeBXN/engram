@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from engram.palace import Palace, Drawer
+from engram.chateau import Chateau, Drawer
 from engram.shorthand import compress
 from engram.config import load_config
 
@@ -152,7 +152,7 @@ class ConvoMiner:
         config:   Merged config dict.
     """
 
-    def __init__(self, palace: Palace, backend, config: Optional[dict] = None) -> None:
+    def __init__(self, palace: Chateau, backend, config: Optional[dict] = None) -> None:
         self.palace = palace
         self.backend = backend
         self.config = config or load_config()
@@ -234,10 +234,10 @@ def _parse_since(since: Optional[str]) -> Optional[datetime]:
 
 
 if __name__ == "__main__":
-    from engram.palace import Palace
+    from engram.chateau import Chateau
     from engram.backends import get_backend
     cfg = load_config()
-    palace = Palace()
+    palace = Chateau()
     backend = get_backend(cfg["vector_backend"])
     cm = ConvoMiner(palace, backend, cfg)
     print("ConvoMiner ready.  Usage: cm.mine('/path/to/exports', wing='myapp')")
