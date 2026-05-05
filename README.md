@@ -1,4 +1,5 @@
 # Engram
+<img width="1408" height="768" alt="Gemini_Generated_Image_9nr9z59nr9z59nr9" src="https://github.com/user-attachments/assets/e04422f2-1974-48c2-8568-238bc2641bdf" />
 
 > **The AI memory layer that never forgets.**
 
