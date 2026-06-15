@@ -319,6 +319,158 @@ def cmd_kg_timeline(
 
 
 # ---------------------------------------------------------------------------
+# engram answer
+# ---------------------------------------------------------------------------
+
+@app.command("answer")
+def cmd_answer(
+    question: str = typer.Argument(..., help="Question to answer from memory."),
+    wing: Optional[str] = typer.Option(None, "--wing", "-w", help="Scope search to a wing."),
+    model: str = typer.Option("llama3.2", "--model", "-m", help="Ollama model to use."),
+    chunks: int = typer.Option(5, "--chunks", "-k", help="Number of memory chunks to retrieve."),
+):
+    """Answer a question grounded in Engram memory (uses Ollama if available)."""
+    from engram.qa import AnswerConfig, AnswerGenerator
+
+    cfg = load_config()
+    palace = _palace()
+    backend = _backend(cfg)
+    searcher = _searcher(palace=palace, backend=backend, cfg=cfg)
+
+    config = AnswerConfig(llm_model=model, max_context_chunks=chunks)
+    generator = AnswerGenerator(searcher, config)
+
+    with console.status("Searching memory and generating answer..."):
+        result = generator.generate(question, wing=wing)
+
+    console.print(f"\n[bold cyan]Question:[/bold cyan] {question}\n")
+    console.print(Panel(result["answer"], title="[bold green]Answer[/bold green]", border_style="green"))
+
+    if result["citations"]:
+        table = Table(title="Memory Sources", show_header=True, header_style="bold dim")
+        table.add_column("#", width=3)
+        table.add_column("Score", width=7)
+        table.add_column("Excerpt", overflow="fold")
+        for c in result["citations"][:3]:
+            table.add_row(str(c["id"]), f"{c['relevance_score']:.3f}", c["text"])
+        console.print(table)
+
+    console.print(
+        f"\n[dim]Confidence: {result['confidence']:.2f} | "
+        f"{result['memory_count']} memories retrieved[/dim]"
+    )
+
+
+# ---------------------------------------------------------------------------
+# engram remember-type
+# ---------------------------------------------------------------------------
+
+@app.command("remember-type")
+def cmd_remember_type(
+    content: str = typer.Argument(..., help="Memory content to store."),
+    type: str = typer.Argument(..., help="Memory type (run 'engram remember-type --list' for options)."),
+    wing: str = typer.Option(..., "--wing", "-w", help="Wing to store in."),
+    room: Optional[str] = typer.Option(None, "--room", "-r", help="Room override (defaults to type name)."),
+    confidence: float = typer.Option(0.8, "--confidence", "-c", min=0.0, max=1.0),
+    source: str = typer.Option("user", "--source", "-s", help="Source: user | ai | miner | conversation"),
+    list_types: bool = typer.Option(False, "--list", help="List all valid memory types and exit."),
+):
+    """Store a typed, validated memory in the château."""
+    from engram.typed_memory import MemoryType, TypedMemory, TypedMemoryStore
+
+    if list_types:
+        console.print("[bold]Valid memory types:[/bold]")
+        for t in MemoryType:
+            console.print(f"  [cyan]{t.value}[/cyan]")
+        return
+
+    try:
+        mem_type = MemoryType.from_string(type)
+    except ValueError as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(1)
+
+    memory = TypedMemory(
+        content=content,
+        memory_type=mem_type,
+        confidence=confidence,
+        source=source,
+    )
+
+    cfg = load_config()
+    palace = _palace()
+    backend = _backend(cfg)
+    store = TypedMemoryStore(palace, backend)
+
+    try:
+        drawer_id = store.add(memory, wing=wing, room=room)
+    except ValueError as exc:
+        console.print(f"[red]Validation failed:[/red] {exc}")
+        raise typer.Exit(1)
+
+    console.print(
+        Panel(
+            f"[bold]{mem_type.value.upper()}[/bold] stored in [cyan]{wing}[/cyan]\n"
+            f"ID: [dim]{drawer_id}[/dim]",
+            title="[green]✓ Memory saved[/green]",
+            border_style="green",
+        )
+    )
+    if confidence < 0.5:
+        console.print(f"[yellow]⚠  Low confidence ({confidence:.2f}) — consider reviewing this memory.[/yellow]")
+
+
+# ---------------------------------------------------------------------------
+# engram provenance
+# ---------------------------------------------------------------------------
+
+@app.command("provenance")
+def cmd_provenance(
+    memory_id: str = typer.Argument(..., help="Drawer ID to inspect."),
+    history: bool = typer.Option(False, "--history", "-H", help="Show full version history."),
+    summary: bool = typer.Option(False, "--summary", help="Show source summary for whole château."),
+):
+    """Inspect provenance and version history for a memory."""
+    from engram.config import get_chateau_path
+    from engram.provenance import ProvenanceTracker
+
+    tracker = ProvenanceTracker(get_chateau_path())
+
+    if summary:
+        counts = tracker.source_summary()
+        table = Table(title="Provenance Source Summary", header_style="bold cyan")
+        table.add_column("Source")
+        table.add_column("Count", justify="right")
+        for src, cnt in sorted(counts.items(), key=lambda x: -x[1]):
+            table.add_row(src, str(cnt))
+        console.print(table)
+        return
+
+    records = tracker.get_history(memory_id) if history else [tracker.get(memory_id)]
+    records = [r for r in records if r is not None]
+
+    if not records:
+        console.print(f"[yellow]No provenance record found for '{memory_id}'.[/yellow]")
+        raise typer.Exit(1)
+
+    table = Table(title=f"Provenance: {memory_id[:16]}…", header_style="bold")
+    table.add_column("Version", width=7)
+    table.add_column("Source", width=12)
+    table.add_column("Confidence", width=10)
+    table.add_column("Created At")
+    table.add_column("Edit Reason", overflow="fold")
+    for r in records:
+        table.add_row(
+            str(r.version),
+            r.source,
+            f"{r.confidence:.2f}",
+            r.created_at.isoformat()[:19],
+            r.edit_reason or "-",
+        )
+    console.print(table)
+
+
+# ---------------------------------------------------------------------------
 # engram conflicts
 # ---------------------------------------------------------------------------
 
