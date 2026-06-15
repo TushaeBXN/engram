@@ -14,6 +14,19 @@ Everything lives on your machine. No cloud. No API key required to run.
 
 ---
 
+## Why Engram?
+
+| | Engram | Cloud memory tools |
+|---|---|---|
+| Cold-start context | **~170 tokens** | 500+ tokens |
+| Install | `pip install engram` | Docker + cloud signup |
+| API key required | **No** | Yes |
+| Data leaves your machine | **Never** | Always |
+| Compression | **ES: 6–10× factual, 4–6× code** | None |
+| Open source | **MIT** | Proprietary |
+
+---
+
 ## Benchmark Targets
 
 | Benchmark            | Metric              | Target    |
@@ -40,6 +53,7 @@ pip install engram
 # Or with optional backends
 pip install "engram[faiss]"       # FAISS speed backend
 pip install "engram[sqlitevec]"   # zero-dependency fallback
+pip install "engram[viz]"         # graph visualisation (matplotlib + networkx)
 pip install "engram[all]"         # everything
 
 # Initialise your memory château
@@ -53,6 +67,13 @@ engram mine ~/Downloads/claude-export --mode convos --wing myapp
 
 # Search
 engram search "auth migration decisions" --wing myapp
+
+# Answer a question grounded in memory (uses Ollama if available)
+engram answer "What did we decide about the auth strategy?" --wing myapp
+
+# Store a typed, validated memory
+engram remember-type "Always prefer float32 on CPU because bfloat16 is unsupported" \
+  instruction --wing myapp --confidence 0.95
 
 # Load cold-start context (~170 tokens)
 engram wake-up
@@ -197,6 +218,42 @@ engram kg invalidate "Kai" works_on "Orion" --ended 2026-03-01
 engram kg timeline "auth-migration"
 ```
 
+### Answer (LLM-grounded QA)
+
+```bash
+engram answer "What auth approach did we choose?"
+engram answer "What did we decide about the DB?" --wing myapp
+engram answer "Why did we drop Redis?" --model llama3.2 --chunks 8
+```
+
+### Typed Memory
+
+```bash
+# Store a categorised, validated memory
+engram remember-type "Prefer SQLite for local dev" preference --wing myapp
+engram remember-type "Use float32 on CPU because bfloat16 unsupported" \
+  instruction --wing anthos --confidence 0.95
+
+# List all 13 valid types
+engram remember-type --list
+```
+
+### Provenance
+
+```bash
+engram provenance <drawer-id>                  # provenance record for one memory
+engram provenance <drawer-id> --history        # full version chain
+engram provenance --summary                    # source counts across château
+```
+
+### Graph Visualisation
+
+```bash
+pip install "engram[viz]"
+engram graph                                   # all wings → memory_graph.png
+engram graph --wing myapp --output myapp.png   # scoped to one wing
+```
+
 ### Maintenance
 
 ```bash
@@ -205,6 +262,9 @@ engram audit                                   # health check
 engram audit --fix                             # auto-resolve safe issues
 engram replay --room auth-migration            # chronological room story
 engram replay --room auth-migration --wing myapp
+engram replay --room auth-migration --type decision          # filter by type
+engram replay --room auth-migration --since 2026-06-01       # filter by date
+engram replay --room auth-migration --min-confidence 0.8     # filter by confidence
 engram status                                  # château overview
 engram split <dir>                             # split concatenated transcripts
 engram split <dir> --dry-run
@@ -245,7 +305,7 @@ engram split <dir> --dry-run
 
 | File                          | Description                                         |
 |-------------------------------|-----------------------------------------------------|
-| `engram/palace.py`            | Wing/Room/Hall/Closet/Drawer data model             |
+| `engram/chateau.py`           | Wing/Room/Hall/Closet/Drawer data model             |
 | `engram/config.py`            | Config loading, `~/.engram/` management             |
 | `engram/shorthand.py`         | Engram Shorthand (ES) compression dialect           |
 | `engram/knowledge_graph.py`   | Temporal KG, SQLite backend                         |
@@ -257,8 +317,11 @@ engram split <dir> --dry-run
 | `engram/conflict.py`          | Contradiction detection + TUI resolver              |
 | `engram/audit.py`             | Memory health audit                                 |
 | `engram/replay.py`            | Session/room replay                                 |
+| `engram/qa.py`                | LLM-grounded QA over memory (Ollama + fallback)     |
+| `engram/typed_memory.py`      | 13-type typed memory with validation + ES storage   |
+| `engram/provenance.py`        | Memory provenance and version-chain tracking        |
 | `engram/agents.py`            | Specialist agent diary system                       |
-| `engram/palace_graph.py`      | Room navigation graph                               |
+| `engram/chateau_graph.py`     | Room navigation graph                               |
 | `engram/onboarding.py`        | Guided init + ES bootstrap                          |
 | `engram/cli.py`               | Typer CLI entry point                               |
 | `engram/mcp_server.py`        | MCP server — 22 tools                               |
@@ -350,6 +413,8 @@ Set `ENGRAM_WING=myapp` and `ENGRAM_ROOM=current-task` in your environment.
 Optional:
 - `faiss-cpu` — FAISS backend
 - `sqlite-vec` — sqlite-vec backend
+- `matplotlib` + `networkx` — graph visualisation (`pip install "engram[viz]"`)
+- `requests` — Ollama API calls for `engram answer`
 
 No API key. No internet after install.
 
