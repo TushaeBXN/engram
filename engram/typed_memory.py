@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -82,6 +83,27 @@ class TypedMemory:
         words = {"prefer", "like", "dislike", "preference", "favor", "rather", "instead"}
         return any(w in self.content.lower() for w in words)
 
+    def to_es_format(self) -> str:
+        """Return ES-compressed representation with type prefix."""
+        from engram.shorthand import compress
+
+        # Map 0.0–1.0 → 1–5 star scale
+        star_weight = max(1, min(5, int(self.confidence * 4) + 1))
+        compressed = compress(self.content, confidence=star_weight)
+        return f"[{self.memory_type.value}] {compressed}"
+
+    @staticmethod
+    def auto_tag(content: str) -> list[str]:
+        """Extract up to 5 key entities from content without any API call."""
+        tags: set[str] = set()
+        tags.update(re.findall(r"`([^`]+)`", content))
+        tags.update(re.findall(r"\b[A-Z][a-z]+(?:[A-Z][a-z]+)+\b", content))  # CamelCase
+        tags.update(re.findall(
+            r"\b(?:auth|db|api|ui|cli|sdk|http|json|sql|ml|ai|cfg|env)\b",
+            content.lower(),
+        ))
+        return list(tags)[:5]
+
     def to_drawer_metadata(self) -> dict[str, Any]:
         """Extra metadata to attach when storing as a Drawer."""
         return {
@@ -129,12 +151,15 @@ class TypedMemoryStore:
         hall = self._TYPE_TO_HALL.get(memory.memory_type, "facts")
         room_name = room or memory.memory_type.value
 
-        tags = list(memory.tags) + [f"type:{memory.memory_type.value}", f"src:{memory.source}"]
+        auto_tags = TypedMemory.auto_tag(memory.content) if not memory.tags else []
+        tags = list(memory.tags or auto_tags) + [f"type:{memory.memory_type.value}", f"src:{memory.source}"]
         if memory.version > 1:
             tags.append(f"v{memory.version}")
 
+        es_content = memory.to_es_format()
+
         drawer = Drawer(
-            content=memory.content,
+            content=es_content,
             wing=wing,
             room=room_name,
             hall=hall,

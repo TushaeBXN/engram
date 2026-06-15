@@ -35,6 +35,7 @@ dependencies = [
 [project.optional-dependencies]
 faiss = ["faiss-cpu>=1.7.0"]
 sqlitevec = ["sqlite-vec>=0.1.0"]
+viz = ["matplotlib>=3.5.0", "networkx>=2.8.0"]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
@@ -42,7 +43,7 @@ dev = [
     "ruff>=0.1.0",
     "pre-commit>=3.0",
 ]
-all = ["faiss-cpu>=1.7.0", "sqlite-vec>=0.1.0"]
+all = ["faiss-cpu>=1.7.0", "sqlite-vec>=0.1.0", "matplotlib>=3.5.0", "networkx>=2.8.0"]
 
 [project.scripts]
 engram = "engram.cli:app"

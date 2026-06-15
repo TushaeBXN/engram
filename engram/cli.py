@@ -508,6 +508,68 @@ def cmd_audit(
 
 
 # ---------------------------------------------------------------------------
+# engram graph
+# ---------------------------------------------------------------------------
+
+@app.command("graph")
+def cmd_graph(
+    wing: Optional[str] = typer.Option(None, "--wing", "-w", help="Wing to visualize (all wings if omitted)."),
+    output: str = typer.Option("memory_graph.png", "--output", "-o", help="Output image path."),
+):
+    """Generate a visualization of memory relationships (requires: pip install engram[viz])."""
+    try:
+        import matplotlib.pyplot as plt  # type: ignore
+        import networkx as nx  # type: ignore
+    except ImportError:
+        console.print("[red]❌[/red] Missing optional deps. Install with: [cyan]pip install engram[viz][/cyan]")
+        raise typer.Exit(1)
+
+    palace = _palace()
+    G: nx.Graph = nx.Graph()
+
+    wings = [wing] if wing else [w.name for w in palace.list_wings()]
+
+    for wname in wings:
+        G.add_node(wname, kind="wing", color="gold")
+        for room in palace.list_rooms(wname):
+            room_node = f"{wname}/{room.name}"
+            G.add_node(room_node, kind="room", color="lightblue")
+            G.add_edge(wname, room_node)
+
+            for drawer in palace.iter_drawers(wing=wname, room=room.name):
+                # Add typed-memory nodes only (tagged with type:*)
+                mem_type = next(
+                    (t.split(":", 1)[1] for t in drawer.tags if t.startswith("type:")),
+                    None,
+                )
+                if mem_type:
+                    type_node = f"{room_node}/{mem_type}"
+                    if not G.has_node(type_node):
+                        G.add_node(type_node, kind="type", color="lightgreen")
+                        G.add_edge(room_node, type_node)
+
+    if not G.nodes:
+        console.print("[yellow]No memory nodes to visualize.[/yellow]")
+        raise typer.Exit(0)
+
+    colors = [G.nodes[n].get("color", "white") for n in G.nodes]
+    plt.figure(figsize=(14, 9))
+    pos = nx.spring_layout(G, seed=42, k=0.8)
+    nx.draw(
+        G, pos,
+        with_labels=True,
+        node_color=colors,
+        edge_color="gray",
+        font_size=8,
+        node_size=800,
+    )
+    plt.title(f"Engram Memory Graph{' — ' + wing if wing else ''}")
+    plt.tight_layout()
+    plt.savefig(output, dpi=150)
+    console.print(f"[green]✓[/green] Graph saved to [cyan]{output}[/cyan] ({G.number_of_nodes()} nodes, {G.number_of_edges()} edges)")
+
+
+# ---------------------------------------------------------------------------
 # engram replay
 # ---------------------------------------------------------------------------
 
@@ -516,13 +578,89 @@ def cmd_replay(
     room: str = typer.Option(..., "--room", "-r", help="Room to replay."),
     wing: Optional[str] = typer.Option(None, "--wing", "-w"),
     limit: int = typer.Option(100, "--limit", "-l", help="Max drawers to show."),
+    memory_type: Optional[str] = typer.Option(None, "--type", "-t", help="Filter by memory type (fact, decision, …)."),
+    since: Optional[str] = typer.Option(None, "--since", help="Show memories on or after date (YYYY-MM-DD)."),
+    min_confidence: float = typer.Option(0.0, "--min-confidence", min=0.0, max=1.0, help="Minimum confidence score."),
 ):
-    """Reconstruct chronological story of a room."""
-    from engram.replay import Replayer
+    """Reconstruct chronological story of a room, with optional type/date/confidence filters."""
+    from datetime import datetime, timezone
+
+    from engram.shorthand import decompress
+    from engram.typed_memory import MemoryType
+
+    # Validate type filter early
+    type_filter: Optional[str] = None
+    if memory_type:
+        try:
+            type_filter = MemoryType.from_string(memory_type).value
+        except ValueError as exc:
+            console.print(f"[red]Error:[/red] {exc}")
+            raise typer.Exit(1)
+
+    # Parse since date
+    since_dt: Optional[datetime] = None
+    if since:
+        try:
+            since_dt = datetime.fromisoformat(since).replace(tzinfo=timezone.utc)
+        except ValueError:
+            console.print("[red]Error:[/red] --since must be YYYY-MM-DD or a full ISO datetime.")
+            raise typer.Exit(1)
+
     palace = _palace()
-    replayer = Replayer(palace)
-    story = replayer.replay(room, wing=wing, limit=limit)
-    console.print(story)
+    drawers = list(palace.iter_drawers(wing=wing, room=room))
+
+    if not drawers:
+        console.print(f"[yellow]No memories found for room '{room}'" + (f" in wing '{wing}'" if wing else "") + ".[/yellow]")
+        return
+
+    # Apply filters
+    if type_filter:
+        tag_match = f"type:{type_filter}"
+        drawers = [d for d in drawers if tag_match in d.tags]
+
+    if since_dt:
+        def _ts(d) -> datetime:
+            try:
+                dt = datetime.fromisoformat(d.timestamp)
+                return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+            except (ValueError, TypeError):
+                return datetime.min.replace(tzinfo=timezone.utc)
+        drawers = [d for d in drawers if _ts(d) >= since_dt]
+
+    if min_confidence > 0.0:
+        # Confidence is stored as a tag token "src:" but the numeric value lives in
+        # backend metadata.  Best-effort: filter by ES star rating in content.
+        import re as _re
+        star_threshold = max(1, min(5, int(min_confidence * 4) + 1))
+        min_stars = "★" * star_threshold
+        drawers = [d for d in drawers if _re.search(r"\[★+\]", d.content) is None
+                   or len(_re.search(r"\[(★+)\]", d.content).group(1)) >= len(min_stars)]  # type: ignore[union-attr]
+
+    if not drawers:
+        console.print("[yellow]No memories matched the given filters.[/yellow]")
+        return
+
+    drawers.sort(key=lambda d: d.timestamp)
+    drawers = drawers[:limit]
+
+    # Display
+    table = Table(
+        title=f"Replay: {room}" + (f" [{type_filter}]" if type_filter else ""),
+        show_header=True,
+        header_style="bold cyan",
+    )
+    table.add_column("Timestamp", width=17, style="dim")
+    table.add_column("Hall", width=12)
+    table.add_column("Content", overflow="fold")
+
+    for d in drawers:
+        text = decompress(d.content)
+        if len(text) > 200:
+            text = text[:197] + "..."
+        table.add_row(d.timestamp[:16], d.hall, text)
+
+    console.print(table)
+    console.print(f"\n[dim]{len(drawers)} memories displayed[/dim]")
 
 
 # ---------------------------------------------------------------------------
