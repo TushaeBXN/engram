@@ -14,6 +14,28 @@ Everything lives on your machine. No cloud. No API key required to run.
 
 ---
 
+## Web UI
+
+```bash
+pip install engram
+engram ui          # opens http://127.0.0.1:7741 in your browser
+```
+
+A **force-directed knowledge graph** that maps every note and the connections between them — built into the package, no configuration needed.
+
+![Engram Web UI](https://github.com/user-attachments/assets/e04422f2-1974-48c2-8568-238bc2641bdf)
+
+- **Knowledge graph** — live force-directed view; hover any node for a preview card
+- **`[[Wikilinks]]`** — type `[[` to autocomplete note titles; links become graph edges instantly  
+- **Wing tabs** — work / personal / ideas / journal, each with its own color and note count
+- **Tag filtering** — click any `#tag` chip to filter the notes list
+- **Pin notes** — float important notes to the top with a purple accent bar
+- **Daily journal** — one click opens or creates today's dated entry
+- **Markdown editor** — live preview, word count, ⌘S to save, ⌘N for a new note
+- **Export / Import** — full JSON round-trip; nothing ever leaves your machine
+
+---
+
 ## Why Engram?
 
 | | Engram | Cloud memory tools |
@@ -78,35 +100,6 @@ engram remember-type "Always prefer float32 on CPU because bfloat16 is unsupport
 # Load cold-start context (~170 tokens)
 engram wake-up
 ```
-
----
-
-## Web UI
-
-Engram ships a single-file browser app — no build step, no server required beyond a tiny Python one.
-
-```bash
-# Open in your default browser (serves on port 7741)
-engram ui
-
-# Custom port
-engram ui --port 8080
-
-# Start without auto-opening (copy the URL yourself)
-engram ui --no-open
-```
-
-The UI gives you a **force-directed knowledge graph** of your notes, a masonry notes grid, a full markdown editor with wikilink autocomplete, and a daily journal shortcut — all stored in your browser's `localStorage`. Nothing leaves your machine.
-
-**Key features:**
-- `[[Wikilinks]]` — type `[[` to autocomplete note titles; links appear as graph edges instantly
-- **Wing tabs** — filter by work / personal / ideas / journal with per-wing note counts in the legend
-- **Tag filtering** — click any `#tag` chip to filter the notes list; dismiss with ×
-- **Pin notes** — star icon floats important notes to the top with a purple accent bar
-- **Daily journal** — one click opens (or creates) today's dated journal entry
-- **Graph tooltips** — hover any node for a preview card: wing, title, snippet, link count
-- **Export / Import** — JSON round-trip from the ⋯ menu; safe for backup or migration
-- **⌘S / ⌘N** — save current note or create a new one from anywhere
 
 ---
 
