@@ -24,7 +24,7 @@ engram ui          # opens http://127.0.0.1:7741 in your browser
 
 A **force-directed knowledge graph** that maps every note and the connections between them — built into the package, no configuration needed.
 
-![Engram Web UI](https://github.com/user-attachments/assets/e04422f2-1974-48c2-8568-238bc2641bdf)
+![Engram Web UI]
 
 - **Knowledge graph** — live force-directed view; hover any node for a preview card
 - **`[[Wikilinks]]`** — type `[[` to autocomplete note titles; links become graph edges instantly  
