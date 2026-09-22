@@ -20,6 +20,7 @@ Everything lives on your machine. No cloud. No API key required to run.
 pip install engram
 engram ui          # opens http://127.0.0.1:7741 in your browser
 ```
+<img width="1126" height="932" alt="Screenshot 2026-09-22 at 10 59 38 AM" src="https://github.com/user-attachments/assets/870d76e7-bdc3-42a5-9056-6a54a1dd7ef1" />
 
 A **force-directed knowledge graph** that maps every note and the connections between them — built into the package, no configuration needed.
 
