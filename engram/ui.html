@@ -474,10 +474,10 @@ kbd { background: var(--surf); border: 1px solid var(--border); border-radius: 4
   <button class="nav-btn" title="Search (⌘K)" onclick="openSearch()">
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
   </button>
-  <button class="nav-btn active" id="nb-graph" title="Graph" onclick="go('graph')">
+  <button class="nav-btn" id="nb-graph" title="Graph" onclick="go('graph')">
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51 15.42 17.49M15.41 6.51 8.59 10.49"/></svg>
   </button>
-  <button class="nav-btn" id="nb-notes" title="All Notes (⌘N = new)" onclick="go('notes')">
+  <button class="nav-btn active" id="nb-notes" title="All Notes (⌘N = new)" onclick="go('notes')">
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
     <span class="nav-badge" id="notes-badge"></span>
   </button>
@@ -491,7 +491,7 @@ kbd { background: var(--surf); border: 1px solid var(--border); border-radius: 4
 <main id="main">
 
   <!-- Graph -->
-  <div class="view active" id="view-graph">
+  <div class="view" id="view-graph">
     <svg id="graph-svg"></svg>
     <div id="graph-legend"></div>
     <div id="graph-hint">Click a node to open · Drag to explore · Scroll to zoom</div>
@@ -500,7 +500,7 @@ kbd { background: var(--surf); border: 1px solid var(--border); border-radius: 4
   </div>
 
   <!-- Notes -->
-  <div class="view" id="view-notes">
+  <div class="view active" id="view-notes">
     <div class="list-header">
       <div class="list-header-top">
         <div class="list-title">Notes</div>
@@ -612,11 +612,11 @@ kbd { background: var(--surf); border: 1px solid var(--border); border-radius: 4
 
 <!-- Mobile bar -->
 <div id="mobile-bar">
-  <button class="mb active" id="mb-graph" onclick="go('graph')">
+  <button class="mb" id="mb-graph" onclick="go('graph')">
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51 15.42 17.49M15.41 6.51 8.59 10.49"/></svg>
     Graph
   </button>
-  <button class="mb" id="mb-notes" onclick="go('notes')">
+  <button class="mb active" id="mb-notes" onclick="go('notes')">
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
     Notes
   </button>
@@ -660,8 +660,8 @@ const SEED = [
 // ── State ─────────────────────────────────────────────────────────────────
 let notes = [];
 let cur = null;
-let view = 'graph';
-let prev = 'graph';
+let view = 'notes';
+let prev = 'notes';
 let wingFilter = 'all';
 let tagFilter = '';
 let saveTimer = null;
@@ -1225,6 +1225,5 @@ document.addEventListener('keydown',e=>{
 
 // ── Boot ──────────────────────────────────────────────────────────────────
 loadNotes();
-updateBadge();
-renderGraph();
+go('notes');
 </script>
