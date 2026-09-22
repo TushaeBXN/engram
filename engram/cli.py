@@ -727,6 +727,65 @@ def cmd_split(
 
 
 # ---------------------------------------------------------------------------
+# engram ui
+# ---------------------------------------------------------------------------
+
+@app.command("ui")
+def cmd_ui(
+    port: int = typer.Option(7741, "--port", "-p", help="Local port to serve the UI on."),
+    no_open: bool = typer.Option(False, "--no-open", help="Skip auto-opening browser."),
+):
+    """Launch the Engram web UI in your browser (serves ui.html on a local port)."""
+    import http.server
+    import threading
+    import webbrowser
+    import time
+
+    ui_file = Path(__file__).parent / "ui.html"
+    if not ui_file.exists():
+        console.print("[red]ui.html not found alongside cli.py[/red]")
+        raise typer.Exit(1)
+
+    serve_dir = ui_file.parent
+
+    class _Handler(http.server.SimpleHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, directory=str(serve_dir), **kwargs)
+
+        def log_message(self, fmt, *args):
+            pass  # silence access log
+
+        def do_GET(self):
+            if self.path == "/" or self.path == "":
+                self.path = "/ui.html"
+            super().do_GET()
+
+    server = http.server.HTTPServer(("127.0.0.1", port), _Handler)
+    url = f"http://127.0.0.1:{port}/"
+
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    console.print(Panel(
+        f"[bold]{url}[/bold]\n\n"
+        "[dim]All data stays in your browser's localStorage — nothing leaves your machine.\n"
+        "Press [bold]Ctrl+C[/bold] to stop.[/dim]",
+        title="[bold #8a7ef4]⬡ Engram UI[/bold #8a7ef4]",
+        border_style="#1f1f38",
+    ))
+
+    if not no_open:
+        time.sleep(0.3)
+        webbrowser.open(url)
+
+    try:
+        thread.join()
+    except KeyboardInterrupt:
+        server.shutdown()
+        console.print("\n[dim]Engram UI stopped.[/dim]")
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 

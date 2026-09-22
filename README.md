@@ -81,6 +81,35 @@ engram wake-up
 
 ---
 
+## Web UI
+
+Engram ships a single-file browser app — no build step, no server required beyond a tiny Python one.
+
+```bash
+# Open in your default browser (serves on port 7741)
+engram ui
+
+# Custom port
+engram ui --port 8080
+
+# Start without auto-opening (copy the URL yourself)
+engram ui --no-open
+```
+
+The UI gives you a **force-directed knowledge graph** of your notes, a masonry notes grid, a full markdown editor with wikilink autocomplete, and a daily journal shortcut — all stored in your browser's `localStorage`. Nothing leaves your machine.
+
+**Key features:**
+- `[[Wikilinks]]` — type `[[` to autocomplete note titles; links appear as graph edges instantly
+- **Wing tabs** — filter by work / personal / ideas / journal with per-wing note counts in the legend
+- **Tag filtering** — click any `#tag` chip to filter the notes list; dismiss with ×
+- **Pin notes** — star icon floats important notes to the top with a purple accent bar
+- **Daily journal** — one click opens (or creates) today's dated journal entry
+- **Graph tooltips** — hover any node for a preview card: wing, title, snippet, link count
+- **Export / Import** — JSON round-trip from the ⋯ menu; safe for backup or migration
+- **⌘S / ⌘N** — save current note or create a new one from anywhere
+
+---
+
 ## Memory Château Architecture
 
 ```
