@@ -115,6 +115,8 @@ Wing  (person or project)
         └── Tunnel  (cross-wing link when same room spans multiple wings)
 ```
 
+Mined notes and conversation messages are sorted into halls by their **content** (e.g. "I prefer…" → preferences, "turns out the root cause…" → discoveries) using a local, rule-based classifier (`engram/classifier.py`). Code and config files keep their extension-based hall; when nothing matches clearly, the old extension/role default is used.
+
 ### Memory Layers
 
 | Layer | Content                        | Size       | When Loaded              |
