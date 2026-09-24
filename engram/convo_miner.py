@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Optional
 
 from engram.chateau import Chateau, Drawer
+from engram.classifier import classify_hall
 from engram.shorthand import compress
 from engram.config import load_config
 
@@ -198,7 +199,8 @@ class ConvoMiner:
         text = msg["text"]
         if len(text) < 20:
             return None
-        hall = "facts" if msg["role"] in ("human", "user") else "discoveries"
+        role_hall = "facts" if msg["role"] in ("human", "user") else "discoveries"
+        hall, _ = classify_hall(text, fallback=role_hall)
         compressed = compress(text)
         drawer = Drawer(
             content=compressed,
