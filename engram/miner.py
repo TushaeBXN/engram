@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Optional
 
 from engram.chateau import Chateau, Drawer, HALL_TYPES
+from engram.classifier import classify_hall
 from engram.shorthand import compress
 from engram.config import load_config
 
@@ -51,6 +52,9 @@ _EXT_HALL: dict[str, str] = {
     ".bash": "advice",
     ".zsh": "advice",
 }
+
+# Prose files whose hall is decided by their content, not their extension
+_PROSE_EXTS = {".md", ".rst", ".txt"}
 
 _CODE_EXTS = {".py", ".js", ".ts", ".tsx", ".jsx", ".go", ".rs", ".c", ".cpp", ".java", ".rb", ".php"}
 
@@ -154,7 +158,6 @@ class Miner:
             return None
 
         ext = path.suffix.lower()
-        hall = _EXT_HALL.get(ext, "facts")
         is_code = ext in _CODE_EXTS
 
         try:
@@ -164,6 +167,11 @@ class Miner:
 
         if not content.strip():
             return None
+
+        if ext in _PROSE_EXTS or ext not in _EXT_HALL:
+            hall, _ = classify_hall(content, fallback=_EXT_HALL.get(ext, "facts"))
+        else:
+            hall = _EXT_HALL[ext]
 
         compressed = compress(content, is_code=is_code)
 
