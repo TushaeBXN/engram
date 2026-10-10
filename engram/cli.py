@@ -520,12 +520,12 @@ def cmd_graph(
     wing: Optional[str] = typer.Option(None, "--wing", "-w", help="Wing to visualize (all wings if omitted)."),
     output: str = typer.Option("memory_graph.png", "--output", "-o", help="Output image path."),
 ):
-    """Generate a visualization of memory relationships (requires: pip install engram[viz])."""
+    """Generate a visualization of memory relationships (requires: pip install matplotlib networkx)."""
     try:
         import matplotlib.pyplot as plt  # type: ignore
         import networkx as nx  # type: ignore
     except ImportError:
-        console.print("[red]❌[/red] Missing optional deps. Install with: [cyan]pip install engram[viz][/cyan]")
+        console.print("[red]❌[/red] Missing optional deps. Install with: [cyan]pip install matplotlib networkx[/cyan]")
         raise typer.Exit(1)
 
     palace = _palace()

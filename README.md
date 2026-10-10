@@ -17,7 +17,7 @@ Everything lives on your machine. No cloud. No API key required to run.
 ## Web UI
 
 ```bash
-pip install engram
+pip install git+https://github.com/TushaeBXN/engram
 engram ui          # opens http://127.0.0.1:7741 in your browser
 ```
 <img width="1126" height="932" alt="Screenshot 2026-09-22 at 10 59 38 AM" src="https://github.com/user-attachments/assets/870d76e7-bdc3-42a5-9056-6a54a1dd7ef1" />
@@ -42,7 +42,7 @@ A **force-directed knowledge graph** that maps every note and the connections be
 | | Engram | Cloud memory tools |
 |---|---|---|
 | Cold-start context | **~170 tokens** | 500+ tokens |
-| Install | `pip install engram` | Docker + cloud signup |
+| Install | One `pip install` (from GitHub) | Docker + cloud signup |
 | API key required | **No** | Yes |
 | Data leaves your machine | **Never** | Always |
 | Compression | **ES shorthand** (~1.4× today, see benchmarks) | None |
@@ -83,15 +83,17 @@ These are goals, not results. Only ES compression is measured today (`python ben
 
 ## Quick Start
 
+> **Note:** the `engram` package on PyPI is an unrelated project. Install Engram from GitHub as shown below, not with `pip install engram`.
+
 ```bash
-# Install
-pip install engram
+# Install (from GitHub; Engram is not on PyPI yet)
+pip install git+https://github.com/TushaeBXN/engram
 
 # Or with optional backends
-pip install "engram[faiss]"       # FAISS speed backend
-pip install "engram[sqlitevec]"   # zero-dependency fallback
-pip install "engram[viz]"         # graph visualisation (matplotlib + networkx)
-pip install "engram[all]"         # everything
+pip install "engram[faiss] @ git+https://github.com/TushaeBXN/engram"       # FAISS speed backend
+pip install "engram[sqlitevec] @ git+https://github.com/TushaeBXN/engram"   # zero-dependency fallback
+pip install "engram[viz] @ git+https://github.com/TushaeBXN/engram"         # graph visualisation (matplotlib + networkx)
+pip install "engram[all] @ git+https://github.com/TushaeBXN/engram"         # everything
 
 # Initialise your memory château
 engram init ~/myproject
@@ -288,7 +290,7 @@ engram provenance --summary                    # source counts across château
 ### Graph Visualisation
 
 ```bash
-pip install "engram[viz]"
+pip install "engram[viz] @ git+https://github.com/TushaeBXN/engram"
 engram graph                                   # all wings → memory_graph.png
 engram graph --wing myapp --output myapp.png   # scoped to one wing
 ```
@@ -458,7 +460,7 @@ Set `ENGRAM_WING=myapp` and `ENGRAM_ROOM=current-task` in your environment.
 Optional:
 - `faiss-cpu` — FAISS backend
 - `sqlite-vec` — sqlite-vec backend
-- `matplotlib` + `networkx` — graph visualisation (`pip install "engram[viz]"`)
+- `matplotlib` + `networkx` — graph visualisation (`pip install "engram[viz] @ git+https://github.com/TushaeBXN/engram"`)
 - `requests` — Ollama API calls for `engram answer`
 
 No API key. No internet after install.

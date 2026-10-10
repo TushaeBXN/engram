@@ -6,7 +6,7 @@ always importable.
 
 Install the full version with::
 
-    pip install engram[sqlitevec]
+    pip install sqlite-vec
 """
 
 from __future__ import annotations

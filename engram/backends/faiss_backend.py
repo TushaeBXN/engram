@@ -3,7 +3,7 @@
 Uses sentence-transformers for embedding (falls back to a hash-based stub
 when unavailable, so imports always succeed).  Install with::
 
-    pip install engram[faiss]
+    pip install faiss-cpu
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ class FaissBackend(VectorBackend):
         except ImportError as exc:
             raise ImportError(
                 "faiss-cpu is required for the faiss backend. "
-                "Install with: pip install engram[faiss]"
+                "Install with: pip install faiss-cpu"
             ) from exc
 
         self._path = Path(index_path).expanduser()
