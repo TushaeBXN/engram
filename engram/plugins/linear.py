@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -81,7 +80,7 @@ class LinearMiner(PluginMiner):
         """# TODO: implement Linear GraphQL API pagination."""
         api_key = os.environ.get("LINEAR_API_KEY", "")
         if not api_key:
-            raise EnvironmentError("LINEAR_API_KEY environment variable not set.")
+            raise OSError("LINEAR_API_KEY environment variable not set.")
         raise NotImplementedError(
             "Live Linear API mining is not yet implemented.  "
             "Export your issues as JSON and use mode='export'."

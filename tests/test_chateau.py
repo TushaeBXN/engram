@@ -1,12 +1,9 @@
 """Tests for engram.chateau — the château data model."""
 
-import json
-import tempfile
-from pathlib import Path
 
 import pytest
 
-from engram.chateau import Chateau, Wing, Room, Hall, Drawer, Closet, Tunnel, HALL_TYPES
+from engram.chateau import HALL_TYPES, Chateau, Closet, Drawer
 
 
 @pytest.fixture

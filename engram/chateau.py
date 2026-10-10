@@ -19,10 +19,11 @@ from __future__ import annotations
 
 import json
 import uuid
-from dataclasses import dataclass, field, asdict
+from collections.abc import Iterator
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Optional
 
 from engram.config import get_chateau_path
 
@@ -78,7 +79,7 @@ class Drawer:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, d: dict) -> "Drawer":
+    def from_dict(cls, d: dict) -> Drawer:
         return cls(**d)
 
     def age_days(self) -> float:
@@ -106,7 +107,7 @@ class Closet:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, d: dict) -> "Closet":
+    def from_dict(cls, d: dict) -> Closet:
         return cls(**d)
 
 
@@ -138,7 +139,7 @@ class Tunnel:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, d: dict) -> "Tunnel":
+    def from_dict(cls, d: dict) -> Tunnel:
         return cls(**d)
 
 
@@ -157,7 +158,7 @@ class Room:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, d: dict) -> "Room":
+    def from_dict(cls, d: dict) -> Room:
         return cls(**d)
 
 
@@ -175,7 +176,7 @@ class Wing:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, d: dict) -> "Wing":
+    def from_dict(cls, d: dict) -> Wing:
         return cls(**d)
 
 

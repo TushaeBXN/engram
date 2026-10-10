@@ -37,7 +37,7 @@ class Provenance:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "Provenance":
+    def from_dict(cls, d: dict) -> Provenance:
         return cls(
             memory_id=d["memory_id"],
             source=d["source"],

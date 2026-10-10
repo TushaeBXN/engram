@@ -8,7 +8,6 @@ when unavailable, so imports always succeed).  Install with::
 
 from __future__ import annotations
 
-import json
 import pickle
 from pathlib import Path
 
@@ -91,7 +90,6 @@ class FaissBackend(VectorBackend):
     # ------------------------------------------------------------------
 
     def add(self, id: str, text: str, metadata: dict) -> None:
-        import numpy as np  # type: ignore
         if id in self._id_map:
             self.update(id, text, metadata)
             return

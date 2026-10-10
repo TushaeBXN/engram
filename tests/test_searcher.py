@@ -1,13 +1,12 @@
 """Tests for engram.searcher — recency-weighted semantic search."""
 
+from datetime import datetime, timedelta, timezone
+from unittest.mock import MagicMock
+
 import pytest
-from pathlib import Path
-from unittest.mock import MagicMock, patch
-from datetime import datetime, timezone, timedelta
 
-from engram.chateau import Chateau, Drawer
+from engram.chateau import Chateau
 from engram.searcher import Searcher, _age_days, _build_where
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

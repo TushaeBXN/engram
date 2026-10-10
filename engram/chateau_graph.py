@@ -14,7 +14,6 @@ Usage::
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Optional
 
 from engram.chateau import Chateau
 

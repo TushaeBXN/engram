@@ -20,9 +20,8 @@ Usage::
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Optional
 
 from engram.config import ENGRAM_DIR
@@ -47,7 +46,7 @@ class AgentProfile:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, d: dict) -> "AgentProfile":
+    def from_dict(cls, d: dict) -> AgentProfile:
         return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
 
 
@@ -66,7 +65,7 @@ class DiaryEntry:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, d: dict) -> "DiaryEntry":
+    def from_dict(cls, d: dict) -> DiaryEntry:
         return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
 
     def readable(self) -> str:

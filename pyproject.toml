@@ -62,7 +62,10 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
-ignore = ["E501"]
+# UP045 rewrites Optional[X] as X | None. Typer evaluates CLI annotations at
+# runtime, where that syntax fails on Python 3.9, so keep Optional while 3.9
+# is supported.
+ignore = ["E501", "UP045"]
 
 [tool.black]
 line-length = 100

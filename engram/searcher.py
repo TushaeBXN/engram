@@ -149,8 +149,8 @@ def _age_days(timestamp: str) -> float:
 
 
 if __name__ == "__main__":
-    from engram.chateau import Chateau
     from engram.backends import get_backend
+    from engram.chateau import Chateau
     cfg = load_config()
     palace = Chateau()
     backend = get_backend(cfg["vector_backend"])

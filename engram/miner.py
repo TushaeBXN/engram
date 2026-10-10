@@ -20,11 +20,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from engram.chateau import Chateau, Drawer, HALL_TYPES
+from engram.chateau import Chateau, Drawer
 from engram.classifier import classify_hall
-from engram.shorthand import compress
 from engram.config import load_config
-
+from engram.shorthand import compress
 
 # File extensions → hall type
 _EXT_HALL: dict[str, str] = {
@@ -212,8 +211,8 @@ def _parse_since(since: Optional[str]) -> Optional[datetime]:
 
 
 if __name__ == "__main__":
-    from engram.chateau import Chateau
     from engram.backends import get_backend
+    from engram.chateau import Chateau
     from engram.config import load_config
 
     cfg = load_config()

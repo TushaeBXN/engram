@@ -16,13 +16,13 @@ Usage::
 from __future__ import annotations
 
 import sqlite3
-from dataclasses import dataclass, field, asdict
+from collections.abc import Iterator
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Optional
 
 from engram.config import ENGRAM_DIR
-
 
 DB_PATH = ENGRAM_DIR / "kg.db"
 
