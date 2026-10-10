@@ -17,7 +17,6 @@ from __future__ import annotations
 import argparse
 import json
 import statistics
-import sys
 import time
 from pathlib import Path
 
@@ -104,16 +103,8 @@ def run_longmemeval(data_dir: Path) -> dict:
     if not sessions_dir.exists():
         return {"error": f"Dataset not found at {data_dir}. See benchmarks/BENCHMARKS.md"}
 
-    from engram.palace import Palace
-    from engram.backends import get_backend
-    from engram.miner import Miner
-    from engram.searcher import Searcher
-
-    palace = Palace()
-    backend = get_backend("chromadb")
-    searcher = Searcher(backend, palace)
-
-    # Stub — real implementation mines sessions and evaluates QA
+    # Stub — a real implementation mines each session into a Chateau and
+    # scores Searcher/AnswerGenerator answers against the gold QA pairs.
     return {
         "status": "stub",
         "note": "Full LongMemEval evaluation not yet implemented.",
