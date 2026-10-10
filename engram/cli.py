@@ -36,9 +36,13 @@ def _palace():
 
 
 def _backend(cfg=None):
-    from engram.backends import get_backend
+    from engram.backends import BackendUnavailableError, get_backend
     c = cfg or load_config()
-    return get_backend(c.get("vector_backend", "chromadb"))
+    try:
+        return get_backend(c.get("vector_backend", "chromadb"))
+    except BackendUnavailableError as exc:
+        console.print(str(exc), style="red", markup=False)
+        raise typer.Exit(1)
 
 
 def _searcher(palace=None, backend=None, cfg=None):

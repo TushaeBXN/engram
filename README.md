@@ -6,7 +6,7 @@
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-106%20passed-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-126%20passed-brightgreen)]()
 
 Engram is a **local-first, open-source AI memory system**. It solves one problem: AI sessions end, but your work doesn't. Every decision, debug session, and architecture choice you've had with an AI disappears the moment the conversation closes. Engram makes it permanent, searchable, and retrievable in ~170 tokens.
 
@@ -319,6 +319,12 @@ engram split <dir> --dry-run
 | `decay_factor`   | `0.005`              | Recency boost per day: `score * (1 + factor * days)` |
 | `decay_max_days` | `90`                 | Days after which decay levels off                     |
 | `collection_name`| `engram_drawers`     | ChromaDB collection name                              |
+
+`ENGRAM_VECTOR_BACKEND` overrides `vector_backend` for a single run without editing the file, e.g. `ENGRAM_VECTOR_BACKEND=sqlitevec engram search "auth"`.
+
+### Troubleshooting: ChromaDB fails to load
+
+ChromaDB 1.x ships compiled Rust bindings (`chromadb_rust_bindings`). If they don't match your Python or platform, Engram prints a `ChromaDB failed to load` message instead of starting. Fix it by reinstalling (`pip install --force-reinstall --no-cache-dir chromadb`) or by switching to the `sqlitevec` backend, which needs no compiled dependencies. Each backend keeps its own index, so re-run `engram mine` after switching.
 
 **`~/.engram/identity.txt`** — plain text, becomes your L0 context.
 
