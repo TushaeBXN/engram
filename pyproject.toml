@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 # PyPI distribution name ("engram" on PyPI is an unrelated project).
 # The command, import name and project are all still "engram".
 name = "engram-chateau"
-version = "1.0.0"
+version = "1.1.0"
 description = "The AI memory layer that never forgets."
 authors = [{name = "Tushae Thomas"}]
 license = "MIT"
