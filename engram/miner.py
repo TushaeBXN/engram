@@ -77,7 +77,8 @@ def _is_text_file(path: Path) -> bool:
 
 
 def _file_id(path: Path) -> str:
-    return hashlib.sha256(str(path).encode()).hexdigest()[:16]
+    """Stable drawer ID for a file, so re-mining it replaces the old drawer."""
+    return "file-" + hashlib.sha256(str(path.resolve()).encode()).hexdigest()[:24]
 
 
 class Miner:
@@ -174,8 +175,11 @@ class Miner:
             wing=wing,
             room=room,
             hall=hall,
+            id=_file_id(path),
             tags=[ext.lstrip("."), "file"],
         )
+        # The file may have moved wing/room/hall since it was last mined.
+        self.palace.delete_drawer_by_id(drawer.id)
         self.palace.save_drawer(drawer)
         self.backend.add(
             id=drawer.id,

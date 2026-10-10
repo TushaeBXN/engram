@@ -56,6 +56,9 @@ Issues = "https://github.com/TushaeBXN/engram/issues"
 where = ["."]
 include = ["engram*"]
 
+[tool.setuptools.package-data]
+engram = ["ui.html", "hooks/*.sh"]
+
 [tool.ruff]
 target-version = "py39"
 line-length = 100

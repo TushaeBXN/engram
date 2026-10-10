@@ -415,13 +415,22 @@ Pinned drawers (`engram_pin`) bypass decay entirely.
 
 ## Claude Code Hooks
 
-Copy hooks to `~/.engram/hooks/` then add to `~/.claude/settings.json`:
+Two hooks keep Engram up to date while you work in Claude Code:
+
+- **Save hook** (PostToolUse): every file Claude writes or edits is mined into the château. Re-saving a file replaces its drawer instead of adding a duplicate.
+- **Pre-compact hook** (PreCompact): before Claude Code compacts a conversation, the session transcript is mined so nothing is lost. Only user and assistant text is stored, not tool calls, tool output or thinking, and running it again on the same session adds no duplicates.
+
+```bash
+engram install-hooks   # copies the scripts to ~/.engram/hooks/ and prints the settings snippet
+```
+
+Merge the printed snippet into `~/.claude/settings.json`. It looks like:
 
 ```json
 {
   "hooks": {
     "PostToolUse": [{
-      "matcher": "Write|Edit",
+      "matcher": "Write|Edit|MultiEdit",
       "hooks": [{"type": "command", "command": "~/.engram/hooks/engram_save_hook.sh"}]
     }],
     "PreCompact": [{
@@ -431,7 +440,7 @@ Copy hooks to `~/.engram/hooks/` then add to `~/.claude/settings.json`:
 }
 ```
 
-Set `ENGRAM_WING=myapp` and `ENGRAM_ROOM=current-task` in your environment.
+Optional environment variables: `ENGRAM_WING` (default `default`), `ENGRAM_ROOM` for transcripts (default `conversation`), `ENGRAM_AGENT` for diary entries (default `claude-code`).
 
 ---
 

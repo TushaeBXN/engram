@@ -355,6 +355,15 @@ class Chateau:
             return True
         return False
 
+    def delete_drawer_by_id(self, drawer_id: str) -> int:
+        """Delete every stored copy of *drawer_id*, in any wing/room/hall."""
+        name = f"{validate_name(drawer_id, 'drawer id')}.json"
+        removed = 0
+        for p in self.path.glob(f"*/*/*/{name}"):
+            p.unlink()
+            removed += 1
+        return removed
+
     def pin_drawer(self, drawer_id: str) -> Optional[Drawer]:
         """Find a drawer by ID anywhere in the château and pin it."""
         for drawer in self.iter_drawers():
