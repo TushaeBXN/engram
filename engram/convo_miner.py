@@ -14,6 +14,7 @@ Usage::
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from datetime import datetime, timezone
@@ -29,9 +30,11 @@ from engram.config import load_config
 # ---------------------------------------------------------------------------
 
 def _detect_format(path: Path) -> str:
-    """Return one of: 'claude', 'chatgpt', 'slack', 'markdown', 'unknown'."""
+    """Return one of: 'claude', 'chatgpt', 'slack', 'markdown', 'claude_code', 'unknown'."""
     if path.suffix == ".md":
         return "markdown"
+    if path.suffix == ".jsonl":
+        return "claude_code" if _looks_like_claude_code(path) else "unknown"
     if path.suffix != ".json":
         return "unknown"
     try:
@@ -48,6 +51,22 @@ def _detect_format(path: Path) -> str:
         if "text" in first and "ts" in first:
             return "slack"
     return "unknown"
+
+
+def _looks_like_claude_code(path: Path) -> bool:
+    """True if the first records look like a Claude Code session transcript."""
+    try:
+        with path.open(encoding="utf-8", errors="replace") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                rec = json.loads(line)
+                if isinstance(rec, dict) and rec.get("type") in ("user", "assistant") \
+                        and isinstance(rec.get("message"), dict):
+                    return True
+    except (OSError, json.JSONDecodeError):
+        return False
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -68,9 +87,12 @@ def _parse_claude(path: Path) -> list[dict]:
                 )
             elif isinstance(parts, str):
                 text = parts
+            if not text.strip():
+                text = msg.get("text", "")  # older exports have no content list
             ts = msg.get("created_at", "")
             if text.strip():
-                messages.append({"role": role, "text": text.strip(), "timestamp": ts})
+                messages.append({"role": role, "text": text.strip(), "timestamp": ts,
+                                 "id": msg.get("uuid")})
     return messages
 
 
@@ -127,11 +149,50 @@ def _parse_markdown(path: Path) -> list[dict]:
     return messages
 
 
+def _parse_claude_code(path: Path) -> list[dict]:
+    """Parse a Claude Code session transcript (one JSON event per line).
+
+    Keeps only the text of user and assistant messages; tool calls, tool
+    results, thinking blocks and meta entries are skipped.
+    """
+    messages = []
+    with path.open(encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(rec, dict) or rec.get("type") not in ("user", "assistant"):
+                continue
+            if rec.get("isMeta"):
+                continue
+            msg = rec.get("message") or {}
+            content = msg.get("content", "")
+            if isinstance(content, str):
+                text = content
+            else:
+                text = "\n".join(
+                    b.get("text", "") for b in content
+                    if isinstance(b, dict) and b.get("type") == "text"
+                )
+            if text.strip():
+                messages.append({
+                    "role": msg.get("role") or rec["type"],
+                    "text": text.strip(),
+                    "timestamp": rec.get("timestamp", ""),
+                    "id": rec.get("uuid"),
+                })
+    return messages
+
+
 _PARSERS = {
     "claude": _parse_claude,
     "chatgpt": _parse_chatgpt,
     "slack": _parse_slack,
     "markdown": _parse_markdown,
+    "claude_code": _parse_claude_code,
 }
 
 
@@ -204,9 +265,11 @@ class ConvoMiner:
             wing=wing,
             room=room,
             hall=hall,
+            id=_message_id(msg),
             timestamp=msg["timestamp"] or datetime.now(timezone.utc).isoformat(),
             tags=["conversation", msg["role"]],
         )
+        self.palace.delete_drawer_by_id(drawer.id)
         self.palace.save_drawer(drawer)
         self.backend.add(
             id=drawer.id,
@@ -220,6 +283,12 @@ class ConvoMiner:
             },
         )
         return drawer
+
+
+def _message_id(msg: dict) -> str:
+    """Stable drawer ID, so importing the same conversation again adds no duplicates."""
+    key = msg.get("id") or f"{msg['role']}|{msg['timestamp']}|{msg['text']}"
+    return "msg-" + hashlib.sha256(str(key).encode()).hexdigest()[:24]
 
 
 def _parse_since(since: Optional[str]) -> Optional[datetime]:

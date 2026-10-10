@@ -79,6 +79,7 @@ def cmd_mine(
     directory: str = typer.Argument(..., help="Directory or file to mine."),
     wing: str = typer.Option("default", "--wing", "-w", help="Wing to assign memories to."),
     mode: str = typer.Option("files", "--mode", "-m", help="'files' or 'convos'."),
+    room: Optional[str] = typer.Option(None, "--room", "-r", help="Room to assign memories to."),
     since: Optional[str] = typer.Option(None, "--since", help="Skip files older than ISO date."),
     plugin: Optional[str] = typer.Option(None, "--plugin", "-p", help="Plugin: obsidian | notion | linear"),
 ):
@@ -119,7 +120,7 @@ def cmd_mine(
 
     with console.status(f"Mining [cyan]{directory}[/cyan]..."):
         try:
-            drawers = miner.mine(directory, wing=wing, mode=mode, since=since)
+            drawers = miner.mine(directory, wing=wing, room=room, mode=mode, since=since)
         except FileNotFoundError as e:
             console.print(f"[red]Error:[/red] {e}")
             raise typer.Exit(1)
@@ -785,6 +786,42 @@ def cmd_ui(
     except KeyboardInterrupt:
         server.shutdown()
         console.print("\n[dim]Engram UI stopped.[/dim]")
+
+
+@app.command("install-hooks")
+def cmd_install_hooks(
+    dest: Path = typer.Option(
+        Path("~/.engram/hooks"), "--dest", help="Directory to copy the hook scripts into."
+    ),
+):
+    """Copy the Claude Code hook scripts and print the settings.json snippet to add."""
+    import json
+    import shutil
+
+    src_dir = Path(__file__).parent / "hooks"
+    target = dest.expanduser()
+    target.mkdir(parents=True, exist_ok=True)
+    installed = {}
+    for script in ("engram_save_hook.sh", "engram_precompact_hook.sh"):
+        out = target / script
+        shutil.copyfile(src_dir / script, out)
+        out.chmod(0o755)
+        installed[script] = str(out)
+
+    snippet = {
+        "hooks": {
+            "PostToolUse": [{
+                "matcher": "Write|Edit|MultiEdit",
+                "hooks": [{"type": "command", "command": installed["engram_save_hook.sh"]}],
+            }],
+            "PreCompact": [{
+                "hooks": [{"type": "command", "command": installed["engram_precompact_hook.sh"]}],
+            }],
+        }
+    }
+    console.print(f"[green]✓[/green] Hooks copied to {target}")
+    console.print("Add this to [bold]~/.claude/settings.json[/bold] (merge with any existing hooks):")
+    print(json.dumps(snippet, indent=2))
 
 
 # ---------------------------------------------------------------------------
