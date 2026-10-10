@@ -2,6 +2,8 @@
 
 ## Target Performance
 
+These are goals. Only ES compression has a working runner today; it currently measures about 1.4× on factual text and 1.2× on code. The LongMemEval and LoCoMo runners are stubs that return `"status": "stub"`.
+
 | Benchmark         | Metric              | Target     | Notes                        |
 |-------------------|---------------------|------------|------------------------------|
 | LongMemEval       | Single-session QA   | ≥ 0.68 F1  | 500-turn conversations       |

@@ -6,7 +6,7 @@
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-126%20passed-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-153%20passed-brightgreen)]()
 
 Engram is a **local-first, open-source AI memory system**. It solves one problem: AI sessions end, but your work doesn't. Every decision, debug session, and architecture choice you've had with an AI disappears the moment the conversation closes. Engram makes it permanent, searchable, and retrievable in ~170 tokens.
 
@@ -45,15 +45,29 @@ A **force-directed knowledge graph** that maps every note and the connections be
 | Install | `pip install engram` | Docker + cloud signup |
 | API key required | **No** | Yes |
 | Data leaves your machine | **Never** | Always |
-| Compression | **ES: 6–10× factual, 4–6× code** | None |
+| Compression | **ES shorthand** (~1.4× today, see benchmarks) | None |
 | Open source | **MIT** | Proprietary |
 
 ---
 
 ## Benchmark Targets
 
-| Benchmark            | Metric              | Target    |
-|----------------------|---------------------|-----------|
+These are goals, not results. Only ES compression is measured today (`python benchmarks/longmemeval_bench.py --compression-only`); the LongMemEval and LoCoMo runners are still stubs.
+
+| Benchmark            | Metric              | Target    | Status                  |
+|----------------------|---------------------|-----------|-------------------------|
+| LongMemEval          | Single-session QA   | ≥ 0.68 F1 | Not yet implemented     |
+| LongMemEval          | Multi-session QA    | ≥ 0.61 F1 | Not yet implemented     |
+| LoCoMo               | Entity recall       | ≥ 0.72    | Not yet implemented     |
+| LoCoMo               | Event recall        | ≥ 0.69    | Not yet implemented     |
+| ES compression       | Factual paragraphs  | 8–10×     | 1.4× measured           |
+| ES compression       | Code-heavy content  | 4–6×      | 1.2× measured           |
+| ES compression       | Mixed               | ~6×       | 1.4× measured           |
+| Cold-start context   | L0 + L1 tokens      | ≤ 170     | Not yet measured        |
+| Search latency p99   | ChromaDB 100k       | < 200ms   | Not yet measured        |
+| Search latency p99   | FAISS 100k          | < 50ms    | Not yet measured        |
+
+----------------------|---------------------|-----------|
 | LongMemEval          | Single-session QA   | ≥ 0.68 F1 |
 | LongMemEval          | Multi-session QA    | ≥ 0.61 F1 |
 | LoCoMo               | Entity recall       | ≥ 0.72    |
