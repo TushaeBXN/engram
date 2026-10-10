@@ -23,6 +23,7 @@ from typing import Optional
 from engram.chateau import Chateau, Drawer
 from engram.classifier import classify_hall
 from engram.config import load_config
+from engram.indexing import index_drawer
 
 # File extensions → hall type
 _EXT_HALL: dict[str, str] = {
@@ -181,10 +182,11 @@ class Miner:
         # The file may have moved wing/room/hall since it was last mined.
         self.palace.delete_drawer_by_id(drawer.id)
         self.palace.save_drawer(drawer)
-        self.backend.add(
-            id=drawer.id,
-            text=content[:2000],  # embed uncompressed for better retrieval
-            metadata={
+        index_drawer(
+            self.backend,
+            drawer.id,
+            content,
+            {
                 "wing": wing,
                 "room": room,
                 "hall": hall,

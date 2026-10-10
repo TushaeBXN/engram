@@ -1,0 +1,283 @@
+[
+ {
+  "question_id": "q1",
+  "question_type": "single-session-user",
+  "question": "What breed is my dog?",
+  "answer": "beagle",
+  "question_date": "2024/01/10",
+  "haystack_session_ids": [
+   "s1a",
+   "s1b",
+   "s1c",
+   "s1d",
+   "s1e"
+  ],
+  "haystack_dates": [
+   "2024/01/01",
+   "2024/01/01",
+   "2024/01/01",
+   "2024/01/01",
+   "2024/01/01"
+  ],
+  "haystack_sessions": [
+   [
+    {
+     "role": "user",
+     "content": "What are good stretches after running?"
+    },
+    {
+     "role": "assistant",
+     "content": "Try calf, hamstring and hip flexor stretches."
+    }
+   ],
+   [
+    {
+     "role": "user",
+     "content": "Recommend a sci-fi novel for a long flight."
+    },
+    {
+     "role": "assistant",
+     "content": "The Left Hand of Darkness is a great pick."
+    }
+   ],
+   [
+    {
+     "role": "user",
+     "content": "How do I repot a monstera?"
+    },
+    {
+     "role": "assistant",
+     "content": "Use a pot two inches wider and chunky aroid mix."
+    }
+   ],
+   [
+    {
+     "role": "user",
+     "content": "Can you help me plan meals for the week? I like pasta, rice dishes and soups, and I want to cook on Sundays so weekday dinners are quick. Can you help me plan meals for the week? I like pasta, rice dishes and soups, and I want to cook on Sundays so weekday dinners are quick. Can you help me plan meals for the week? I like pasta, rice dishes and soups, and I want to cook on Sundays so weekday dinners are quick. "
+    },
+    {
+     "role": "assistant",
+     "content": "Batch-cook a big pot of minestrone and a tray of roasted vegetables."
+    }
+   ],
+   [
+    {
+     "role": "user",
+     "content": "I adopted a beagle named Biscuit last month and he loves walks."
+    },
+    {
+     "role": "assistant",
+     "content": "Beagles are wonderful, energetic dogs!"
+    }
+   ]
+  ],
+  "answer_session_ids": [
+   "s1e"
+  ]
+ },
+ {
+  "question_id": "q2",
+  "question_type": "single-session-user",
+  "question": "What car did I buy?",
+  "answer": "Subaru Outback",
+  "question_date": "2024/01/10",
+  "haystack_session_ids": [
+   "s2a",
+   "s2b",
+   "s2c",
+   "s2d",
+   "s2e"
+  ],
+  "haystack_dates": [
+   "2024/01/01",
+   "2024/01/01",
+   "2024/01/01",
+   "2024/01/01",
+   "2024/01/01"
+  ],
+  "haystack_sessions": [
+   [
+    {
+     "role": "user",
+     "content": "What are good stretches after running?"
+    },
+    {
+     "role": "assistant",
+     "content": "Try calf, hamstring and hip flexor stretches."
+    }
+   ],
+   [
+    {
+     "role": "user",
+     "content": "Recommend a sci-fi novel for a long flight."
+    },
+    {
+     "role": "assistant",
+     "content": "The Left Hand of Darkness is a great pick."
+    }
+   ],
+   [
+    {
+     "role": "user",
+     "content": "How do I repot a monstera?"
+    },
+    {
+     "role": "assistant",
+     "content": "Use a pot two inches wider and chunky aroid mix."
+    }
+   ],
+   [
+    {
+     "role": "user",
+     "content": "Can you help me plan meals for the week? I like pasta, rice dishes and soups, and I want to cook on Sundays so weekday dinners are quick. Can you help me plan meals for the week? I like pasta, rice dishes and soups, and I want to cook on Sundays so weekday dinners are quick. Can you help me plan meals for the week? I like pasta, rice dishes and soups, and I want to cook on Sundays so weekday dinners are quick. "
+    },
+    {
+     "role": "assistant",
+     "content": "Batch-cook a big pot of minestrone and a tray of roasted vegetables."
+    }
+   ],
+   [
+    {
+     "role": "user",
+     "content": "I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. I am writing up notes about my garden. By the way, my new car is a blue 2019 Subaru Outback that I bought in March."
+    },
+    {
+     "role": "assistant",
+     "content": "Keeping garden notes is a great habit."
+    }
+   ]
+  ],
+  "answer_session_ids": [
+   "s2e"
+  ]
+ },
+ {
+  "question_id": "q3",
+  "question_type": "single-session-assistant",
+  "question": "Which novel did you recommend for my flight?",
+  "answer": "The Left Hand of Darkness",
+  "question_date": "2024/01/10",
+  "haystack_session_ids": [
+   "s3a",
+   "s3b",
+   "s3c",
+   "s3d"
+  ],
+  "haystack_dates": [
+   "2024/01/01",
+   "2024/01/01",
+   "2024/01/01",
+   "2024/01/01"
+  ],
+  "haystack_sessions": [
+   [
+    {
+     "role": "user",
+     "content": "What are good stretches after running?"
+    },
+    {
+     "role": "assistant",
+     "content": "Try calf, hamstring and hip flexor stretches."
+    }
+   ],
+   [
+    {
+     "role": "user",
+     "content": "Recommend a sci-fi novel for a long flight."
+    },
+    {
+     "role": "assistant",
+     "content": "The Left Hand of Darkness is a great pick."
+    }
+   ],
+   [
+    {
+     "role": "user",
+     "content": "How do I repot a monstera?"
+    },
+    {
+     "role": "assistant",
+     "content": "Use a pot two inches wider and chunky aroid mix."
+    }
+   ],
+   [
+    {
+     "role": "user",
+     "content": "Can you help me plan meals for the week? I like pasta, rice dishes and soups, and I want to cook on Sundays so weekday dinners are quick. Can you help me plan meals for the week? I like pasta, rice dishes and soups, and I want to cook on Sundays so weekday dinners are quick. Can you help me plan meals for the week? I like pasta, rice dishes and soups, and I want to cook on Sundays so weekday dinners are quick. "
+    },
+    {
+     "role": "assistant",
+     "content": "Batch-cook a big pot of minestrone and a tray of roasted vegetables."
+    }
+   ]
+  ],
+  "answer_session_ids": [
+   "s3b"
+  ]
+ },
+ {
+  "question_id": "q4",
+  "question_type": "multi-session",
+  "question": "How should I repot my monstera and what stretches help after running?",
+  "answer": "wider pot, aroid mix; calf/hamstring stretches",
+  "question_date": "2024/01/10",
+  "haystack_session_ids": [
+   "s4a",
+   "s4b",
+   "s4c",
+   "s4d"
+  ],
+  "haystack_dates": [
+   "2024/01/01",
+   "2024/01/01",
+   "2024/01/01",
+   "2024/01/01"
+  ],
+  "haystack_sessions": [
+   [
+    {
+     "role": "user",
+     "content": "What are good stretches after running?"
+    },
+    {
+     "role": "assistant",
+     "content": "Try calf, hamstring and hip flexor stretches."
+    }
+   ],
+   [
+    {
+     "role": "user",
+     "content": "Recommend a sci-fi novel for a long flight."
+    },
+    {
+     "role": "assistant",
+     "content": "The Left Hand of Darkness is a great pick."
+    }
+   ],
+   [
+    {
+     "role": "user",
+     "content": "How do I repot a monstera?"
+    },
+    {
+     "role": "assistant",
+     "content": "Use a pot two inches wider and chunky aroid mix."
+    }
+   ],
+   [
+    {
+     "role": "user",
+     "content": "Can you help me plan meals for the week? I like pasta, rice dishes and soups, and I want to cook on Sundays so weekday dinners are quick. Can you help me plan meals for the week? I like pasta, rice dishes and soups, and I want to cook on Sundays so weekday dinners are quick. Can you help me plan meals for the week? I like pasta, rice dishes and soups, and I want to cook on Sundays so weekday dinners are quick. "
+    },
+    {
+     "role": "assistant",
+     "content": "Batch-cook a big pot of minestrone and a tray of roasted vegetables."
+    }
+   ]
+  ],
+  "answer_session_ids": [
+   "s4a",
+   "s4c"
+  ]
+ }
+]

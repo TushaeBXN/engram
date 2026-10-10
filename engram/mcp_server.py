@@ -361,9 +361,10 @@ class EngramMCPServer:
 
     def _tool_engram_add_memory(self, content, wing="default", room="general", hall="facts", pinned=False):
         from engram.chateau import Drawer
+        from engram.indexing import index_drawer
         drawer = Drawer(content=content, wing=wing, room=room, hall=hall, pinned=pinned)
         self.palace.save_drawer(drawer)
-        self.backend.add(drawer.id, content[:2000], {
+        index_drawer(self.backend, drawer.id, content, {
             "wing": wing, "room": room, "hall": hall,
             "timestamp": drawer.timestamp, "pinned": pinned,
         })
@@ -414,9 +415,10 @@ class EngramMCPServer:
         return None
 
     def _tool_engram_delete_drawer(self, wing, room, hall, drawer_id):
+        from engram.indexing import unindex_drawer
         ok = self.palace.delete_drawer(wing, room, hall, drawer_id)
         if ok:
-            self.backend.delete(drawer_id)
+            unindex_drawer(self.backend, drawer_id)
         return {"deleted": ok}
 
     def _tool_engram_create_wing(self, name, description=""):
@@ -454,11 +456,12 @@ class EngramMCPServer:
         return replayer.replay(room, wing=wing, limit=limit)
 
     def _tool_engram_pin(self, drawer_id):
+        from engram.indexing import index_drawer
         drawer = self.palace.pin_drawer(drawer_id)
         if drawer:
-            # Update vector backend metadata
-            self.backend.add(
-                drawer.id, drawer.content[:2000],
+            # Re-index so the pinned flag reaches the vector backend
+            index_drawer(
+                self.backend, drawer.id, drawer.content,
                 {"wing": drawer.wing, "room": drawer.room, "hall": drawer.hall,
                  "timestamp": drawer.timestamp, "pinned": True},
             )

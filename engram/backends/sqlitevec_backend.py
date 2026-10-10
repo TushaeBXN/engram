@@ -129,6 +129,15 @@ class SqliteVecBackend(VectorBackend):
         self._conn.execute("DELETE FROM engram_entries WHERE id = ?", (id,))
         self._conn.commit()
 
+    def delete_where(self, where: dict) -> None:
+        rows = self._conn.execute("SELECT id, metadata FROM engram_entries").fetchall()
+        ids = [
+            (r["id"],) for r in rows
+            if all(json.loads(r["metadata"]).get(k) == v for k, v in where.items())
+        ]
+        self._conn.executemany("DELETE FROM engram_entries WHERE id = ?", ids)
+        self._conn.commit()
+
     def count(self) -> int:
         return self._conn.execute("SELECT COUNT(*) FROM engram_entries").fetchone()[0]
 

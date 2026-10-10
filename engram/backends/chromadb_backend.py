@@ -49,7 +49,7 @@ class ChromaDBBackend(VectorBackend):
             "include": ["documents", "metadatas", "distances"],
         }
         if where:
-            kwargs["where"] = where
+            kwargs["where"] = _chroma_where(where)
         try:
             res = self._col.query(**kwargs)
         except Exception:
@@ -70,6 +70,12 @@ class ChromaDBBackend(VectorBackend):
                 }
             )
         return results
+
+    def delete_where(self, where: dict) -> None:
+        try:
+            self._col.delete(where=_chroma_where(where))
+        except Exception:
+            pass
 
     def delete(self, id: str) -> None:
         try:
@@ -103,3 +109,10 @@ def _sanitise(metadata: dict) -> dict:
 if __name__ == "__main__":
     backend = ChromaDBBackend()
     print(f"ChromaDB collection '{backend._collection_name}' — {backend.count()} entries")
+
+
+def _chroma_where(where: dict) -> dict:
+    """ChromaDB needs ``$and`` to combine more than one metadata filter."""
+    if len(where) <= 1:
+        return dict(where)
+    return {"$and": [{k: v} for k, v in where.items()]}

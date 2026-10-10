@@ -20,6 +20,12 @@ class _Backend:
     def add(self, id, text, metadata):
         self.added[id] = text
 
+    def delete(self, id):
+        self.added.pop(id, None)
+
+    def delete_where(self, where):
+        pass
+
 
 @pytest.fixture
 def palace(tmp_path):
