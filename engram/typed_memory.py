@@ -83,13 +83,21 @@ class TypedMemory:
         words = {"prefer", "like", "dislike", "preference", "favor", "rather", "instead"}
         return any(w in self.content.lower() for w in words)
 
+    def to_tagged_text(self) -> str:
+        """Original text with a type prefix and confidence stars (stored in drawers)."""
+        from engram.shorthand import annotate_confidence
+
+        return annotate_confidence(f"[{self.memory_type.value}] {self.content}", self._star_weight())
+
+    def _star_weight(self) -> int:
+        """Map confidence 0.0–1.0 to a 1–5 star scale."""
+        return max(1, min(5, int(self.confidence * 4) + 1))
+
     def to_es_format(self) -> str:
         """Return ES-compressed representation with type prefix."""
         from engram.shorthand import compress
 
-        # Map 0.0–1.0 → 1–5 star scale
-        star_weight = max(1, min(5, int(self.confidence * 4) + 1))
-        compressed = compress(self.content, confidence=star_weight)
+        compressed = compress(self.content, confidence=self._star_weight())
         return f"[{self.memory_type.value}] {compressed}"
 
     @staticmethod
@@ -156,10 +164,8 @@ class TypedMemoryStore:
         if memory.version > 1:
             tags.append(f"v{memory.version}")
 
-        es_content = memory.to_es_format()
-
         drawer = Drawer(
-            content=es_content,
+            content=memory.to_tagged_text(),
             wing=wing,
             room=room_name,
             hall=hall,

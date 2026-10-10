@@ -361,8 +361,7 @@ class EngramMCPServer:
 
     def _tool_engram_add_memory(self, content, wing="default", room="general", hall="facts", pinned=False):
         from engram.chateau import Drawer
-        from engram.shorthand import compress
-        drawer = Drawer(content=compress(content), wing=wing, room=room, hall=hall, pinned=pinned)
+        drawer = Drawer(content=content, wing=wing, room=room, hall=hall, pinned=pinned)
         self.palace.save_drawer(drawer)
         self.backend.add(drawer.id, content[:2000], {
             "wing": wing, "room": room, "hall": hall,

@@ -25,7 +25,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from engram.config import ENGRAM_DIR
-from engram.shorthand import compress, decompress
+from engram.shorthand import decompress
 
 AGENTS_DIR = ENGRAM_DIR / "agents"
 
@@ -52,24 +52,26 @@ class AgentProfile:
 
 @dataclass
 class DiaryEntry:
-    """A single ES-compressed diary entry."""
+    """A single diary entry (original text; legacy entries are ES-compressed)."""
 
     agent: str
-    content: str              # ES-compressed text
+    content: str
     timestamp: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
     tags: list[str] = field(default_factory=list)
+    compressed: bool = False
 
     def to_dict(self) -> dict:
         return asdict(self)
 
     @classmethod
     def from_dict(cls, d: dict) -> DiaryEntry:
+        d = {"compressed": True, **d}  # legacy entries stored ES-compressed text
         return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
 
     def readable(self) -> str:
-        return decompress(self.content)
+        return decompress(self.content) if self.compressed else self.content
 
 
 class AgentDiary:
@@ -125,10 +127,10 @@ class AgentDiary:
     # ------------------------------------------------------------------
 
     def write(self, text: str, tags: Optional[list[str]] = None) -> DiaryEntry:
-        """Write a new diary entry (ES-compressed)."""
+        """Write a new diary entry."""
         entry = DiaryEntry(
             agent=self.name,
-            content=compress(text),
+            content=text,
             tags=tags or [],
         )
         with self._diary_path.open("a") as f:

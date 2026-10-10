@@ -60,7 +60,12 @@ def validate_name(name: str, kind: str = "name") -> str:
 
 @dataclass
 class Drawer:
-    """Verbatim memory unit.  Never summarised — source of truth."""
+    """Verbatim memory unit.  Never summarised — source of truth.
+
+    ``compressed`` is False for drawers that hold the original text. Drawers
+    written before Engram stored originals hold ES-compressed text; they have
+    no ``compressed`` key on disk and load with ``compressed=True``.
+    """
 
     content: str
     wing: str
@@ -73,6 +78,7 @@ class Drawer:
     decay_weight: float = 1.0
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     tags: list[str] = field(default_factory=list)
+    compressed: bool = False
 
     # ------------------------------------------------------------------
     def to_dict(self) -> dict:
@@ -80,7 +86,15 @@ class Drawer:
 
     @classmethod
     def from_dict(cls, d: dict) -> Drawer:
+        d = {"compressed": True, **d}  # legacy drawers stored ES-compressed text
         return cls(**d)
+
+    def text(self) -> str:
+        """Readable content: the original text, or an expansion of legacy ES text."""
+        if self.compressed:
+            from engram.shorthand import decompress
+            return decompress(self.content)
+        return self.content
 
     def age_days(self) -> float:
         """Days since this drawer was created."""

@@ -175,3 +175,63 @@ def test_compress_strips_extra_whitespace():
 def test_compress_strips_blank_lines():
     result = compress("line1\n\n\n\nline2")
     assert "\n\n\n" not in result
+
+
+# ---------------------------------------------------------------------------
+# Whole-word matching (regressions: symbols used to replace parts of words)
+# ---------------------------------------------------------------------------
+
+import pytest  # noqa: E402
+
+from engram.shorthand import _compress_code  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    "word",
+    ["standard", "order", "original", "theory", "cannot",
+     "unimportant", "notable", "android", "island", "history", "hashed", "thesis"],
+)
+def test_words_containing_symbol_phrases_are_untouched(word):
+    assert word in compress(f"see {word} here")
+
+
+def test_authorization_becomes_authz_not_auth_or():
+    assert compress("authorization rules") == "authz rules"
+
+
+def test_urls_and_colons_survive_round_trip():
+    text = "Docs: see https://example.com/a|b for details"
+    assert "https://example.com/a|b" in decompress(compress(text))
+    assert decompress("Note: x | y & z") == "Note: x | y & z"
+
+
+def test_paths_and_inline_code_are_protected():
+    out = compress("The fix is in src/the/auth.py and `if a and not b` works")
+    assert "src/the/auth.py" in out
+    assert "`if a and not b`" in out
+
+
+def test_decompress_expands_unambiguous_symbols():
+    assert decompress("deploy failed ∴ rollback") == "deploy failed therefore rollback"
+    assert decompress("x ¬ready") == "x not ready"
+
+
+def test_longest_phrase_wins():
+    assert "owns:" in compress("the service is responsible for billing")
+    assert ":owns" not in compress("the service is responsible for billing")
+
+
+def test_filler_words_dropped():
+    assert compress("It is really just a very simple fix") == "It:simple fix"
+
+
+def test_code_mode_does_not_apply_english_table():
+    code = "if user and not admin or is_guest:\n    return the_result\n"
+    out = compress(code, is_code=True)
+    assert "user and not admin or is_guest" in out
+    assert "the_result" in out
+
+
+def test_code_mode_compacts_indentation_and_blank_lines():
+    code = "def f(a: int = 1):\n\n        x = a\n        return x\n"
+    assert _compress_code(code) == "fn:f(a: int)\n  x = a\n  return x"

@@ -21,7 +21,6 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from engram.chateau import Chateau
-from engram.shorthand import decompress
 
 
 class Replayer:
@@ -78,7 +77,7 @@ class Replayer:
             ts_str = _fmt_ts(drawer.timestamp)
             pin_marker = " 📌" if drawer.pinned else ""
             hall_label = drawer.hall.upper()
-            text = decompress(drawer.content)
+            text = drawer.text()
             # Wrap long lines
             if len(text) > 300:
                 text = text[:297] + "..."
@@ -102,7 +101,7 @@ class Replayer:
                 "id": d.id,
                 "timestamp": d.timestamp,
                 "hall": d.hall,
-                "content": decompress(d.content),
+                "content": d.text(),
                 "pinned": d.pinned,
             }
             for d in drawers[:limit]

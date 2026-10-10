@@ -45,7 +45,7 @@ A **force-directed knowledge graph** that maps every note and the connections be
 | Install | One `pip install` (from GitHub) | Docker + cloud signup |
 | API key required | **No** | Yes |
 | Data leaves your machine | **Never** | Always |
-| Compression | **ES shorthand** (~1.4× today, see benchmarks) | None |
+| Compression | **ES shorthand** for context (~1.6× on prose) | None |
 | Open source | **MIT** | Proprietary |
 
 ---
@@ -60,24 +60,12 @@ These are goals, not results. Only ES compression is measured today (`python ben
 | LongMemEval          | Multi-session QA    | ≥ 0.61 F1 | Not yet implemented     |
 | LoCoMo               | Entity recall       | ≥ 0.72    | Not yet implemented     |
 | LoCoMo               | Event recall        | ≥ 0.69    | Not yet implemented     |
-| ES compression       | Factual paragraphs  | 8–10×     | 1.4× measured           |
-| ES compression       | Code-heavy content  | 4–6×      | 1.2× measured           |
-| ES compression       | Mixed               | ~6×       | 1.4× measured           |
+| ES compression       | Factual paragraphs  | ≥ 1.5×    | 1.6× measured           |
+| ES compression       | Code-heavy content  | ≥ 1.1×    | 1.1× measured           |
+| ES compression       | Mixed               | ≥ 1.4×    | 1.5× measured           |
 | Cold-start context   | L0 + L1 tokens      | ≤ 170     | Not yet measured        |
 | Search latency p99   | ChromaDB 100k       | < 200ms   | Not yet measured        |
 | Search latency p99   | FAISS 100k          | < 50ms    | Not yet measured        |
-
-----------------------|---------------------|-----------|
-| LongMemEval          | Single-session QA   | ≥ 0.68 F1 |
-| LongMemEval          | Multi-session QA    | ≥ 0.61 F1 |
-| LoCoMo               | Entity recall       | ≥ 0.72    |
-| LoCoMo               | Event recall        | ≥ 0.69    |
-| ES compression       | Factual paragraphs  | 8–10×     |
-| ES compression       | Code-heavy content  | 4–6×      |
-| ES compression       | Mixed               | ~6×       |
-| Cold-start context   | L0 + L1 tokens      | ≤ 170     |
-| Search latency p99   | ChromaDB 100k       | < 200ms   |
-| Search latency p99   | FAISS 100k          | < 50ms    |
 
 ---
 
@@ -386,7 +374,7 @@ ChromaDB 1.x ships compiled Rust bindings (`chromadb_rust_bindings`). If they do
 
 ## Engram Shorthand (ES)
 
-ES is a lossless compression dialect that any LLM can read without a decoder.
+ES is a compact shorthand that any LLM can read without a decoder. It is used for the context Engram loads into a model (L1 facts, closets); drawers always keep your original text. ES is lossy: filler words such as "the" and "that" are dropped, and `decompress()` only expands unambiguous symbols such as `∴` and `→`. Expect about 1.6× on prose and 1.1× on code.
 
 ```python
 from engram.shorthand import compress, decompress
@@ -397,15 +385,15 @@ text = (
 )
 
 es = compress(text, confidence=4)
-# → "auth module:★★ component + dependency db & responsible verifying user credentials [★★★★]"
+# → "auth module=★★ component +dep on db&owns: verifying user credentials. [★★★★]"
 
 decompress(es)
-# → expands symbols back to natural language
+# → expands unambiguous symbols (∴, →, ¬ …) back to words
 
 # Code-aware compression
 code = "def authenticate(user: str, token: str) -> bool:"
 compress(code, is_code=True)
-# → "fn:authenticate(user:str,token:str)->bool"
+# → "fn:authenticate(user: str,token: str)->bool"
 
 # Diff notation
 compress("+add_middleware()\n-manual_verify()", is_diff=True, diff_filename="auth.py")

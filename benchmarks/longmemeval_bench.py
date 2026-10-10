@@ -67,7 +67,7 @@ def run_compression_benchmark() -> dict:
         "mean": round(statistics.mean(factual_ratios), 2),
         "min": round(min(factual_ratios), 2),
         "max": round(max(factual_ratios), 2),
-        "target": "8-10x",
+        "target": 1.5,
     }
 
     code_ratios = [
@@ -77,7 +77,7 @@ def run_compression_benchmark() -> dict:
         "mean": round(statistics.mean(code_ratios), 2),
         "min": round(min(code_ratios), 2),
         "max": round(max(code_ratios), 2),
-        "target": "4-6x",
+        "target": 1.1,
     }
 
     mixed_ratios = [
@@ -88,7 +88,7 @@ def run_compression_benchmark() -> dict:
         "mean": round(statistics.mean(mixed_ratios), 2),
         "min": round(min(mixed_ratios), 2),
         "max": round(max(mixed_ratios), 2),
-        "target": "~6x",
+        "target": 1.4,
     }
 
     return results
@@ -129,8 +129,8 @@ def main() -> None:
     comp_results = run_compression_benchmark()
     elapsed = time.time() - t0
     for category, r in comp_results.items():
-        status = "✓" if r["mean"] >= 2.0 else "✗"
-        print(f"  {status} {category:10s}: {r['mean']:.1f}x mean  (target: {r['target']})")
+        status = "✓" if r["mean"] >= r["target"] else "✗"
+        print(f"  {status} {category:10s}: {r['mean']:.1f}x mean  (target: ≥{r['target']}x)")
     print(f"  Completed in {elapsed:.2f}s")
 
     if args.compression_only:

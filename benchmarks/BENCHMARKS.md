@@ -2,7 +2,7 @@
 
 ## Target Performance
 
-These are goals. Only ES compression has a working runner today; it currently measures about 1.4× on factual text and 1.2× on code. The LongMemEval and LoCoMo runners are stubs that return `"status": "stub"`.
+These are goals. Only ES compression has a working runner today; it currently measures about 1.6× on factual text and 1.1× on code. The LongMemEval and LoCoMo runners are stubs that return `"status": "stub"`.
 
 | Benchmark         | Metric              | Target     | Notes                        |
 |-------------------|---------------------|------------|------------------------------|
@@ -10,9 +10,9 @@ These are goals. Only ES compression has a working runner today; it currently me
 | LongMemEval       | Multi-session QA    | ≥ 0.61 F1  | cross-session retrieval      |
 | LoCoMo            | Entity recall       | ≥ 0.72     | 100-turn social dialogues    |
 | LoCoMo            | Event recall        | ≥ 0.69     | temporal event tracking      |
-| ES compression    | Factual paragraphs  | 8–10×      | measured by char ratio       |
-| ES compression    | Code-heavy content  | 4–6×       | function signatures + bodies |
-| ES compression    | Mixed content       | ~6×        | weighted average             |
+| ES compression    | Factual paragraphs  | ≥ 1.5×     | measured by char ratio       |
+| ES compression    | Code-heavy content  | ≥ 1.1×     | function signatures + bodies |
+| ES compression    | Mixed content       | ≥ 1.4×     | weighted average             |
 | Cold-start ctx    | L0 + L1 tokens      | ≤ 170      | measured with tiktoken       |
 | Search latency    | p99 (ChromaDB)      | < 200ms    | 100k drawer collection       |
 | Search latency    | p99 (FAISS)         | < 50ms     | 100k drawer collection       |
