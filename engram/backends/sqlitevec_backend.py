@@ -1,17 +1,23 @@
-"""sqlite-vec vector backend — zero-dependency fallback.
+"""SQLite vector backend — dependency-free fallback.
 
-Uses sqlite-vec extension for vector search.  Falls back to pure-Python
-cosine similarity when sqlite-vec is not installed, so the backend is
-always importable.
+Stores entries and their vectors in a single SQLite file and ranks them by
+cosine similarity in pure Python, so it works without ChromaDB or any
+compiled extension.
 
-Install the full version with::
+Vectors come from ``sentence-transformers`` (all-MiniLM-L6-v2) when it is
+installed, giving semantic search. Without it, a hashed bag-of-words vector
+is used, which ranks by keyword overlap. Install the model for better
+results::
 
-    pip install sqlite-vec
+    pip install sentence-transformers
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
+import math
+import re
 import sqlite3
 import struct
 from pathlib import Path
@@ -77,13 +83,7 @@ class SqliteVecBackend(VectorBackend):
         if self._embedder:
             vec = self._embedder.encode([text], normalize_embeddings=True)
             return vec[0].tolist()
-        # deterministic stub
-        import hashlib, math
-        raw = hashlib.sha256(text.encode()).digest()
-        floats = [b / 255.0 for b in raw]
-        floats = (floats * (_EMBED_DIM // len(floats) + 1))[:_EMBED_DIM]
-        norm = math.sqrt(sum(x * x for x in floats)) + 1e-9
-        return [x / norm for x in floats]
+        return _hashed_bow(text)
 
     @staticmethod
     def _pack(vec: list[float]) -> bytes:
@@ -138,8 +138,33 @@ class SqliteVecBackend(VectorBackend):
 
 # ---------------------------------------------------------------------------
 
+_TOKEN_RE = re.compile(r"[a-z0-9]+")
+
+
+def _hashed_bow(text: str) -> list[float]:
+    """Keyword vector used when no embedding model is installed.
+
+    Each lowercase word is hashed into one of ``_EMBED_DIM`` slots with a
+    random sign (the "hashing trick"), weighted by log term frequency and
+    L2-normalised. Texts that share words get a high cosine score and
+    unrelated texts score near zero, so search still ranks by keyword
+    overlap without sentence-transformers.
+    """
+    counts: dict[str, int] = {}
+    for tok in _TOKEN_RE.findall(text.lower()):
+        counts[tok] = counts.get(tok, 0) + 1
+
+    vec = [0.0] * _EMBED_DIM
+    for tok, n in counts.items():
+        h = int.from_bytes(hashlib.blake2b(tok.encode(), digest_size=8).digest(), "big")
+        sign = 1.0 if (h >> 63) & 1 else -1.0
+        vec[h % _EMBED_DIM] += sign * (1.0 + math.log(n))
+
+    norm = math.sqrt(sum(x * x for x in vec))
+    return [x / norm for x in vec] if norm else vec
+
+
 def _cosine(a: list[float], b: list[float]) -> float:
-    import math
     dot = sum(x * y for x, y in zip(a, b))
     na = math.sqrt(sum(x * x for x in a)) + 1e-9
     nb = math.sqrt(sum(x * x for x in b)) + 1e-9
