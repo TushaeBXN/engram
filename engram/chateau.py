@@ -33,6 +33,27 @@ HALL_TYPES = ("facts", "events", "discoveries", "preferences", "advice")
 
 
 # ---------------------------------------------------------------------------
+# Name validation
+# ---------------------------------------------------------------------------
+
+class InvalidNameError(ValueError):
+    """Raised when a wing / room / hall / drawer / agent name is unsafe as a path part."""
+
+
+def validate_name(name: str, kind: str = "name") -> str:
+    """Return *name* if it is safe to use as a single path component.
+
+    Names arrive from the CLI, miners and MCP clients, and become directory or
+    file names, so anything that could step outside the château is rejected.
+    """
+    if not isinstance(name, str) or not name.strip():
+        raise InvalidNameError(f"{kind} must be a non-empty string")
+    if name in (".", "..") or Path(name).anchor or any(c in name for c in ("/", "\\", "\0")):
+        raise InvalidNameError(f"Invalid {kind} {name!r}: must not contain '/', '\\' or be '.' / '..'")
+    return name
+
+
+# ---------------------------------------------------------------------------
 # Dataclasses
 # ---------------------------------------------------------------------------
 
@@ -188,7 +209,7 @@ class Chateau:
     # ------------------------------------------------------------------
 
     def wing_path(self, wing: str) -> Path:
-        return self.path / wing
+        return self.path / validate_name(wing, "wing")
 
     def list_wings(self) -> list[Wing]:
         wings = []
@@ -224,7 +245,7 @@ class Chateau:
     # ------------------------------------------------------------------
 
     def room_path(self, wing: str, room: str) -> Path:
-        return self.wing_path(wing) / room
+        return self.wing_path(wing) / validate_name(room, "room")
 
     def list_rooms(self, wing: str) -> list[Room]:
         wp = self.wing_path(wing)
@@ -267,19 +288,21 @@ class Chateau:
     # ------------------------------------------------------------------
 
     def hall_path(self, wing: str, room: str, hall: str) -> Path:
-        return self.room_path(wing, room) / hall
+        return self.room_path(wing, room) / validate_name(hall, "hall")
+
+    def _drawer_file(self, wing: str, room: str, hall: str, drawer_id: str) -> Path:
+        return self.hall_path(wing, room, hall) / f"{validate_name(drawer_id, 'drawer id')}.json"
 
     def save_drawer(self, drawer: Drawer) -> Path:
         """Persist a drawer to disk.  Creates wing/room/hall if needed."""
         self.ensure_room(drawer.wing, drawer.room)
-        hp = self.hall_path(drawer.wing, drawer.room, drawer.hall)
-        hp.mkdir(parents=True, exist_ok=True)
-        dest = hp / f"{drawer.id}.json"
+        dest = self._drawer_file(drawer.wing, drawer.room, drawer.hall, drawer.id)
+        dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(json.dumps(drawer.to_dict(), indent=2))
         return dest
 
     def get_drawer(self, wing: str, room: str, hall: str, drawer_id: str) -> Optional[Drawer]:
-        p = self.hall_path(wing, room, hall) / f"{drawer_id}.json"
+        p = self._drawer_file(wing, room, hall, drawer_id)
         if p.exists():
             return Drawer.from_dict(json.loads(p.read_text()))
         return None
@@ -311,7 +334,7 @@ class Chateau:
                             continue
 
     def delete_drawer(self, wing: str, room: str, hall: str, drawer_id: str) -> bool:
-        p = self.hall_path(wing, room, hall) / f"{drawer_id}.json"
+        p = self._drawer_file(wing, room, hall, drawer_id)
         if p.exists():
             p.unlink()
             return True

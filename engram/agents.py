@@ -81,7 +81,9 @@ class AgentDiary:
     """
 
     def __init__(self, agent_name: str) -> None:
-        self.name = agent_name
+        from engram.chateau import validate_name
+
+        self.name = validate_name(agent_name, "agent name")
         AGENTS_DIR.expanduser().mkdir(parents=True, exist_ok=True)
         self._profile_path = (AGENTS_DIR / f"{agent_name}.json").expanduser()
         self._diary_path = (AGENTS_DIR / f"{agent_name}_diary.jsonl").expanduser()
