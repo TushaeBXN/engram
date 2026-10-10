@@ -33,6 +33,11 @@ class VectorBackend(ABC):
         ...
 
     @abstractmethod
+    def delete_where(self, where: dict) -> None:
+        """Remove every entry whose metadata matches all key/value pairs in *where*."""
+        ...
+
+    @abstractmethod
     def count(self) -> int:
         """Return total number of stored embeddings."""
         ...

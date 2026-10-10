@@ -140,6 +140,12 @@ class _Backend:
     def add(self, id, text, metadata):
         pass
 
+    def delete(self, id):
+        pass
+
+    def delete_where(self, where):
+        pass
+
 
 def test_claude_code_transcript_detection_and_parsing(tmp_path):
     transcript = write_transcript(tmp_path / "session.jsonl")

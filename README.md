@@ -52,12 +52,12 @@ A **force-directed knowledge graph** that maps every note and the connections be
 
 ## Benchmark Targets
 
-These are goals, not results. Only ES compression is measured today (`python benchmarks/longmemeval_bench.py --compression-only`); the LongMemEval and LoCoMo runners are still stubs.
+These are goals, not results. ES compression is measured today; the LongMemEval runner is ready but its full 500-question score has not been published yet, and the LoCoMo runner is still a stub. See [benchmarks/BENCHMARKS.md](benchmarks/BENCHMARKS.md) to reproduce.
 
 | Benchmark            | Metric              | Target    | Status                  |
 |----------------------|---------------------|-----------|-------------------------|
-| LongMemEval          | Single-session QA   | ≥ 0.68 F1 | Not yet implemented     |
-| LongMemEval          | Multi-session QA    | ≥ 0.61 F1 | Not yet implemented     |
+| LongMemEval          | Session recall R@5  | ≥ 0.95    | Runner ready, not yet run |
+| LongMemEval          | Session recall R@10 | ≥ 0.97    | Runner ready, not yet run |
 | LoCoMo               | Entity recall       | ≥ 0.72    | Not yet implemented     |
 | LoCoMo               | Event recall        | ≥ 0.69    | Not yet implemented     |
 | ES compression       | Factual paragraphs  | ≥ 1.5×    | 1.6× measured           |

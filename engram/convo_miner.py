@@ -24,6 +24,7 @@ from typing import Optional
 from engram.chateau import Chateau, Drawer
 from engram.classifier import classify_hall
 from engram.config import load_config
+from engram.indexing import index_drawer
 
 # ---------------------------------------------------------------------------
 # Format detectors
@@ -247,11 +248,16 @@ class ConvoMiner:
                 messages = _PARSERS[fmt](fpath)
             except Exception:
                 continue
-            room_name = room or fpath.stem
-            for msg in messages:
-                d = self._store_message(msg, wing, room_name)
-                if d:
-                    drawers.append(d)
+            drawers.extend(self.store_messages(messages, wing, room or fpath.stem))
+        return drawers
+
+    def store_messages(self, messages: list[dict], wing: str, room: str) -> list[Drawer]:
+        """Store already-parsed messages ({"role", "text", "timestamp"[, "id"]})."""
+        drawers = []
+        for msg in messages:
+            d = self._store_message(msg, wing, room)
+            if d:
+                drawers.append(d)
         return drawers
 
     def _store_message(self, msg: dict, wing: str, room: str) -> Optional[Drawer]:
@@ -271,10 +277,11 @@ class ConvoMiner:
         )
         self.palace.delete_drawer_by_id(drawer.id)
         self.palace.save_drawer(drawer)
-        self.backend.add(
-            id=drawer.id,
-            text=text[:2000],
-            metadata={
+        index_drawer(
+            self.backend,
+            drawer.id,
+            text,
+            {
                 "wing": wing,
                 "room": room,
                 "hall": hall,

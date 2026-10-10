@@ -182,7 +182,8 @@ class TypedMemoryStore:
             "source": memory.source,
             **memory.to_drawer_metadata(),
         }
-        self.backend.add(drawer.id, memory.content, meta)
+        from engram.indexing import index_drawer
+        index_drawer(self.backend, drawer.id, memory.content, meta)
 
         return drawer.id
 

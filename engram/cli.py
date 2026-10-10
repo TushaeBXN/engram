@@ -98,8 +98,9 @@ def cmd_mine(
         drawers = []
         for doc in docs:
             from engram.chateau import Drawer
+            from engram.indexing import index_drawer
             d = Drawer(
-                content=doc["content"][:4000],
+                content=doc["content"],
                 wing=wing,
                 room=Path(doc["metadata"].get("path", "unknown")).stem,
                 hall="facts",
@@ -107,7 +108,7 @@ def cmd_mine(
                 tags=["plugin", plugin],
             )
             palace.save_drawer(d)
-            backend.add(d.id, doc["content"][:2000], {
+            index_drawer(backend, d.id, doc["content"], {
                 "wing": wing, "room": d.room, "hall": d.hall,
                 "timestamp": d.timestamp, "source": plugin,
             })

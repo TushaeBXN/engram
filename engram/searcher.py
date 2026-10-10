@@ -21,6 +21,7 @@ from typing import Optional
 from engram.backends.base import VectorBackend
 from engram.chateau import Chateau, Drawer
 from engram.config import load_config
+from engram.indexing import drawer_id_of
 
 
 class Searcher:
@@ -77,7 +78,8 @@ class Searcher:
                 }
         """
         where = _build_where(wing, room, hall)
-        raw = self.backend.search(query, n=n * 3, where=where or None)  # over-fetch then re-rank
+        # Over-fetch: several hits may be chunks of the same drawer.
+        raw = self.backend.search(query, n=n * 5, where=where or None)
 
         decay_factor = self.config.get("decay_factor", 0.005)
         decay_max_days = self.config.get("decay_max_days", 90)
@@ -99,7 +101,7 @@ class Searcher:
 
             scored.append(
                 {
-                    "id": hit["id"],
+                    "id": drawer_id_of(hit),
                     "text": hit["text"],
                     "metadata": meta,
                     "semantic_score": round(sem, 4),
@@ -110,7 +112,11 @@ class Searcher:
             )
 
         scored.sort(key=lambda x: x["final_score"], reverse=True)
-        return scored[:n]
+        # Keep only the best-matching chunk of each drawer; its text is the snippet.
+        best: dict[str, dict] = {}
+        for hit in scored:
+            best.setdefault(hit["id"], hit)
+        return list(best.values())[:n]
 
     def get_by_id(self, drawer_id: str) -> Optional[Drawer]:
         """Fetch a drawer by ID from the palace."""

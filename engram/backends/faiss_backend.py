@@ -62,13 +62,9 @@ class FaissBackend(VectorBackend):
         if self._embedder:
             vec = self._embedder.encode([text], normalize_embeddings=True)
             return vec.astype("float32")
-        # deterministic stub — l2-norm of char hash values
-        import hashlib
-        raw = hashlib.sha256(text.encode()).digest()
-        arr = np.frombuffer(raw, dtype=np.uint8).astype("float32")
-        arr = arr[:_EMBED_DIM] if len(arr) >= _EMBED_DIM else np.pad(arr, (0, _EMBED_DIM - len(arr)))
-        norm = np.linalg.norm(arr)
-        return (arr / (norm + 1e-9)).reshape(1, -1)
+        # No embedding model: keyword vector (see sqlitevec_backend._hashed_bow)
+        from engram.backends.sqlitevec_backend import _hashed_bow
+        return np.asarray(_hashed_bow(text), dtype="float32").reshape(1, -1)
 
     def _save(self) -> None:
         self._faiss.write_index(self._index, str(self._index_file))
@@ -127,6 +123,11 @@ class FaissBackend(VectorBackend):
             int_id = self._id_map.pop(id)
             self._meta.pop(int_id, None)
             self._save()
+
+    def delete_where(self, where: dict) -> None:
+        doomed = [m["id"] for m in self._meta.values() if _match_where(m["metadata"], where)]
+        for id in doomed:
+            self.delete(id)
 
     def count(self) -> int:
         return len(self._id_map)
