@@ -53,13 +53,13 @@ class EngramWatcher:
 
     def start(self) -> None:
         """Start watching (blocking).  Press Ctrl-C to stop."""
-        from watchdog.observers import Observer  # type: ignore
-        from watchdog.events import FileSystemEventHandler  # type: ignore
-        from engram.chateau import Chateau
-        from engram.backends import get_backend
-        from engram.miner import Miner
         from rich.console import Console
-        from rich import print as rprint
+        from watchdog.events import FileSystemEventHandler  # type: ignore
+        from watchdog.observers import Observer  # type: ignore
+
+        from engram.backends import get_backend
+        from engram.chateau import Chateau
+        from engram.miner import Miner
 
         console = Console()
         palace = Chateau(self._chateau_path)

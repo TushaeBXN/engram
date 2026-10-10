@@ -16,7 +16,6 @@ Usage::
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Optional
 
@@ -24,12 +23,11 @@ from rich.console import Console
 from rich.panel import Panel
 
 from engram.config import (
-    ensure_engram_dir,
-    save_config,
-    save_wing_config,
-    load_config,
     ENGRAM_DIR,
     IDENTITY_PATH,
+    ensure_engram_dir,
+    load_config,
+    save_config,
 )
 
 console = Console()
@@ -113,7 +111,7 @@ class Onboarder:
         # Create wing in palace
         from engram.chateau import Chateau
         palace = Chateau()
-        palace.create_wing(wing, description=f"Initialised via engram init")
+        palace.create_wing(wing, description="Initialised via engram init")
         console.print(f"  [green]✓[/green] Wing '[bold]{wing}[/bold]' created.")
 
     def _choose_backend(self) -> None:
@@ -152,8 +150,8 @@ class Onboarder:
             answer = "n"
 
         if answer == "y":
-            from engram.chateau import Chateau
             from engram.backends import get_backend
+            from engram.chateau import Chateau
             from engram.miner import Miner
             palace = Chateau()
             backend = get_backend(self.cfg.get("vector_backend", "chromadb"))

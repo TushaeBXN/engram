@@ -38,7 +38,6 @@ import sys
 import traceback
 from typing import Any
 
-
 # ---------------------------------------------------------------------------
 # MCP protocol helpers (minimal stdio JSON-RPC implementation)
 # ---------------------------------------------------------------------------
@@ -331,12 +330,12 @@ class EngramMCPServer:
     """Stateful MCP server — initialised once, tools share state."""
 
     def __init__(self) -> None:
-        from engram.config import load_config
-        from engram.chateau import Chateau
         from engram.backends import get_backend
-        from engram.searcher import Searcher
-        from engram.layers import LayerStack
+        from engram.chateau import Chateau
+        from engram.config import load_config
         from engram.knowledge_graph import KnowledgeGraph
+        from engram.layers import LayerStack
+        from engram.searcher import Searcher
 
         self.cfg = load_config()
         self.palace = Chateau()

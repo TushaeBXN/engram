@@ -1,7 +1,8 @@
 """Tests for engram.knowledge_graph — temporal SQLite KG."""
 
+
 import pytest
-from pathlib import Path
+
 from engram.knowledge_graph import KnowledgeGraph, Triple
 
 

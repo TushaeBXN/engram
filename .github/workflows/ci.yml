@@ -44,7 +44,6 @@ jobs:
           python-version: "3.12"
       - name: Install ruff
         run: python -m pip install ruff
-      # Only errors that break code at runtime (syntax errors, undefined
-      # names). The existing style backlog is not enforced yet.
-      - name: Ruff (critical errors)
-        run: ruff check --select E9,F63,F7,F82 engram tests examples benchmarks
+      # Rules and exceptions are configured in pyproject.toml.
+      - name: Ruff
+        run: ruff check .

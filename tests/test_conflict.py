@@ -1,15 +1,15 @@
 """Tests for engram.conflict — contradiction detection and resolver."""
 
+
 import pytest
-from pathlib import Path
 
 from engram.conflict import (
+    Conflict,
     ConflictDetector,
     ConflictResolver,
-    detect_text_conflicts,
-    Conflict,
     _extract_entity,
     _format_conflict,
+    detect_text_conflicts,
 )
 from engram.knowledge_graph import KnowledgeGraph, Triple
 

@@ -20,7 +20,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
 
-from engram.chateau import Chateau, Drawer
+from engram.chateau import Chateau
 from engram.shorthand import decompress
 
 

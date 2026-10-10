@@ -19,13 +19,12 @@ Usage::
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Optional
 
-from engram.chateau import Chateau, HALL_TYPES
+from engram.chateau import HALL_TYPES, Chateau
+from engram.config import ENGRAM_DIR, get_identity, load_config
 from engram.searcher import Searcher
-from engram.shorthand import compress, decompress
-from engram.config import get_identity, ENGRAM_DIR, load_config
+from engram.shorthand import compress
 
 _L1_PATH = ENGRAM_DIR / "l1_facts.es"
 
@@ -148,8 +147,8 @@ class LayerStack:
 
 
 if __name__ == "__main__":
-    from engram.chateau import Chateau
     from engram.backends import get_backend
+    from engram.chateau import Chateau
     cfg = load_config()
     palace = Chateau()
     backend = get_backend(cfg["vector_backend"])

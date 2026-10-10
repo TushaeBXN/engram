@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional
 
-from engram.chateau import Chateau, HALL_TYPES
+from engram.chateau import HALL_TYPES, Chateau
 from engram.knowledge_graph import KnowledgeGraph
 
 
@@ -160,8 +160,8 @@ class Auditor:
 
     def _build_closets(self, wing: str, room: str) -> None:
         """Build ES closets for a room from its drawers."""
-        from engram.shorthand import compress
         from engram.chateau import Closet
+        from engram.shorthand import compress
 
         for hall in HALL_TYPES:
             drawers = list(self.palace.iter_drawers(wing=wing, room=room, hall=hall))
@@ -207,6 +207,7 @@ def format_report(report: AuditReport) -> str:
 
 if __name__ == "__main__":
     from rich.console import Console
+
     from engram.chateau import Chateau
     from engram.knowledge_graph import KnowledgeGraph
 

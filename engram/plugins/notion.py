@@ -76,7 +76,7 @@ class NotionMiner(PluginMiner):
         """
         token = os.environ.get("NOTION_TOKEN", "")
         if not token:
-            raise EnvironmentError(
+            raise OSError(
                 "NOTION_TOKEN environment variable not set. "
                 "Export your Notion workspace to Markdown instead."
             )

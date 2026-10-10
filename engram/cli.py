@@ -13,9 +13,8 @@ import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
-from rich import print as rprint
 
-from engram.config import load_config, get_chateau_path
+from engram.config import get_chateau_path, load_config
 
 app = typer.Typer(
     name="engram",
@@ -89,8 +88,8 @@ def cmd_mine(
     backend = _backend(cfg)
 
     if plugin:
-        from engram.plugins import get_plugin
         from engram.miner import Miner
+        from engram.plugins import get_plugin
         plug = get_plugin(plugin)
         with console.status(f"Fetching from [cyan]{directory}[/cyan] via [bold]{plugin}[/bold]..."):
             docs = plug.fetch(directory)
@@ -218,8 +217,8 @@ def cmd_compress(
     room: Optional[str] = typer.Option(None, "--room", "-r", help="Room to compress."),
 ):
     """Rebuild ES closets for wings/rooms."""
+    from engram.chateau import HALL_TYPES, Closet
     from engram.shorthand import compress as es_compress
-    from engram.chateau import Closet, HALL_TYPES
     palace = _palace()
 
     wings_to_process = [w.name for w in palace.list_wings()] if not wing else [wing]
@@ -742,8 +741,8 @@ def cmd_ui(
     """Launch the Engram web UI in your browser (serves ui.html on a local port)."""
     import http.server
     import threading
-    import webbrowser
     import time
+    import webbrowser
 
     ui_file = Path(__file__).parent / "ui.html"
     if not ui_file.exists():

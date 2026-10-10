@@ -22,9 +22,8 @@ from typing import Optional
 
 from engram.chateau import Chateau, Drawer
 from engram.classifier import classify_hall
-from engram.shorthand import compress
 from engram.config import load_config
-
+from engram.shorthand import compress
 
 # ---------------------------------------------------------------------------
 # Format detectors
@@ -236,8 +235,8 @@ def _parse_since(since: Optional[str]) -> Optional[datetime]:
 
 
 if __name__ == "__main__":
-    from engram.chateau import Chateau
     from engram.backends import get_backend
+    from engram.chateau import Chateau
     cfg = load_config()
     palace = Chateau()
     backend = get_backend(cfg["vector_backend"])

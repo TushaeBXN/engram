@@ -18,12 +18,11 @@ Usage::
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
 
 from engram.knowledge_graph import KnowledgeGraph, Triple
-
 
 # ---------------------------------------------------------------------------
 # Conflict dataclass
@@ -146,7 +145,6 @@ class ConflictResolver:
 
         from rich.console import Console
         from rich.panel import Panel
-        from rich.text import Text
 
         console = Console()
 
@@ -190,7 +188,6 @@ class ConflictResolver:
     # ------------------------------------------------------------------
 
     def _apply_resolution(self, conflict: Conflict, resolution: str, console) -> None:
-        from rich.console import Console
 
         now = datetime.now(timezone.utc).isoformat()
         t = conflict.stored_triple

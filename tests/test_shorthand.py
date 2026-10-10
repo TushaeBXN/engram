@@ -1,15 +1,12 @@
 """Tests for engram.shorthand — Engram Shorthand (ES) compression."""
 
-import pytest
 from engram.shorthand import (
-    compress,
-    decompress,
-    compression_ratio,
-    annotate_confidence,
-    _compress_code_signature,
     _compact_args,
+    annotate_confidence,
+    compress,
+    compression_ratio,
+    decompress,
 )
-
 
 # ---------------------------------------------------------------------------
 # Basic compress / decompress round-trips

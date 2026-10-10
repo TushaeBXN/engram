@@ -27,7 +27,7 @@ class MemoryType(Enum):
     ERROR = "error"
 
     @classmethod
-    def from_string(cls, value: str) -> "MemoryType":
+    def from_string(cls, value: str) -> MemoryType:
         try:
             return cls(value.lower())
         except ValueError:

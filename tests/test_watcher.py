@@ -1,8 +1,8 @@
 """Tests for engram.watcher — watch mode."""
 
+from unittest.mock import MagicMock
+
 import pytest
-from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 from engram.watcher import EngramWatcher
 
