@@ -23,7 +23,6 @@ from typing import Optional
 from engram.chateau import Chateau, Drawer
 from engram.classifier import classify_hall
 from engram.config import load_config
-from engram.shorthand import compress
 
 # ---------------------------------------------------------------------------
 # Format detectors
@@ -200,9 +199,8 @@ class ConvoMiner:
             return None
         role_hall = "facts" if msg["role"] in ("human", "user") else "discoveries"
         hall, _ = classify_hall(text, fallback=role_hall)
-        compressed = compress(text)
         drawer = Drawer(
-            content=compressed,
+            content=text,
             wing=wing,
             room=room,
             hall=hall,

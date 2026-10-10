@@ -588,7 +588,6 @@ def cmd_replay(
     """Reconstruct chronological story of a room, with optional type/date/confidence filters."""
     from datetime import datetime, timezone
 
-    from engram.shorthand import decompress
     from engram.typed_memory import MemoryType
 
     # Validate type filter early
@@ -657,7 +656,7 @@ def cmd_replay(
     table.add_column("Content", overflow="fold")
 
     for d in drawers:
-        text = decompress(d.content)
+        text = d.text()
         if len(text) > 200:
             text = text[:197] + "..."
         table.add_row(d.timestamp[:16], d.hall, text)

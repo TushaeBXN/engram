@@ -109,7 +109,7 @@ class LayerStack:
         drawers = list(self.palace.iter_drawers(wing=wing, room=room))
         drawers.sort(key=lambda d: d.timestamp, reverse=True)
         for drawer in drawers[:n]:
-            parts.append(f"  [{drawer.hall}] {drawer.content[:300]}")
+            parts.append(f"  [{drawer.hall}] {drawer.text()[:300]}")
         return "\n".join(parts)
 
     # ------------------------------------------------------------------

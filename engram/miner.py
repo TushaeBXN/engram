@@ -23,7 +23,6 @@ from typing import Optional
 from engram.chateau import Chateau, Drawer
 from engram.classifier import classify_hall
 from engram.config import load_config
-from engram.shorthand import compress
 
 # File extensions → hall type
 _EXT_HALL: dict[str, str] = {
@@ -55,7 +54,6 @@ _EXT_HALL: dict[str, str] = {
 # Prose files whose hall is decided by their content, not their extension
 _PROSE_EXTS = {".md", ".rst", ".txt"}
 
-_CODE_EXTS = {".py", ".js", ".ts", ".tsx", ".jsx", ".go", ".rs", ".c", ".cpp", ".java", ".rb", ".php"}
 
 # Files/directories to skip
 _SKIP_DIRS = {
@@ -157,7 +155,6 @@ class Miner:
             return None
 
         ext = path.suffix.lower()
-        is_code = ext in _CODE_EXTS
 
         try:
             content = path.read_text(encoding="utf-8", errors="replace")
@@ -172,10 +169,8 @@ class Miner:
         else:
             hall = _EXT_HALL[ext]
 
-        compressed = compress(content, is_code=is_code)
-
         drawer = Drawer(
-            content=compressed,
+            content=content,
             wing=wing,
             room=room,
             hall=hall,

@@ -1,22 +1,27 @@
-"""Engram Shorthand (ES) — a lossless compression dialect for AI context.
+"""Engram Shorthand (ES) — a compact, LLM-readable shorthand for AI context.
 
 Design principles
 -----------------
 * **Readable by any LLM** without a decoder — the shorthand is plain text.
-* **Factual / relational data**: positional shorthand, symbols replace words.
-* **Code-aware**: compress function signatures, not bodies.
+* **Whole words only** — symbols replace complete words and phrases, never
+  parts of words, so "authorization" or "standard" are never mangled.
+* **Factual / relational data**: symbols replace common words and phrases;
+  filler words ("the", "that", "very" …) are dropped.
+* **Code-aware**: compact function signatures and indentation; the English
+  symbol table is never applied to code.
 * **Diffs**: CHANGE:file|add:symbol|rm:symbol notation.
 * **Confidence weights**: ★★★★ (4/5) = high confidence.
 
-Compression targets (approximate)
-----------------------------------
-* Factual paragraphs : 8–10×
-* Code-heavy content  : 4–6×
-* Mixed               : ~6× average
+ES is lossy and is meant for context, not storage: drawers keep the original
+text. ``decompress()`` is best-effort and only expands symbols that cannot
+appear in ordinary text (∴ ∵ → ¬ …); ASCII operators such as ":" and "|"
+are left alone so URLs, code and punctuation survive.
 
-``compress()`` is fully invertible via ``decompress()``.  Both functions
-operate on plain strings and add/remove only ES tokens — no semantic
-changes are made to the content.
+Typical ratios (benchmarks/longmemeval_bench.py --compression-only)
+-------------------------------------------------------------------
+* Factual paragraphs : ~1.6×
+* Code-heavy content  : ~1.1×
+* Mixed               : ~1.5×
 """
 
 from __future__ import annotations
@@ -28,8 +33,19 @@ from typing import Optional
 # ES symbol table
 # ---------------------------------------------------------------------------
 
-# Bidirectional: compress replaces LHS → RHS; decompress replaces RHS → LHS.
+# (phrase, replacement). Phrases match whole words only, case-insensitively,
+# so "or" never touches "authorization" and "and" never touches "standard".
+# They are applied longest phrase first.
 SYMBOL_TABLE: list[tuple[str, str]] = [
+    # Wordy phrases
+    ("due to the fact that", "∵"),
+    ("in order to", "to"),
+    ("is able to", "can"),
+    ("are able to", "can"),
+    ("a lot of", "many"),
+    ("as well as", "&"),
+    ("at this point in time", "now"),
+    ("in the event that", "if"),
     # Logical / temporal
     ("therefore", "∴"),
     ("because", "∵"),
@@ -38,75 +54,133 @@ SYMBOL_TABLE: list[tuple[str, str]] = [
     ("results in", "→"),
     ("caused by", "←"),
     ("not equal to", "≠"),
-    ("not equal", "≠"),
-    ("greater than or equal", "≥"),
-    ("less than or equal", "≤"),
+    ("greater than or equal to", "≥"),
+    ("less than or equal to", "≤"),
     ("approximately", "≈"),
     ("infinity", "∞"),
+    ("does not", "¬"),
+    ("do not", "¬"),
+    ("did not", "¬"),
+    ("is not", "¬"),
+    ("not", "¬"),
     ("and", "&"),
     ("or", "|"),
-    ("not ", "¬"),
-    # Common words
-    ("the ", ""),           # articles stripped
-    ("The ", ""),
-    ("is a ", "="),
-    (" is ", ":"),
-    (" are ", ":"),
-    (" was ", "<"),
-    (" were ", "<"),
-    (" will be ", ">"),
-    (" has ", "+"),
-    (" have ", "+"),
-    (" had ", "+"),
-    (" does not ", "¬"),
-    (" do not ", "¬"),
-    (" did not ", "¬"),
-    ("with ", "w/"),
-    ("without ", "w/o "),
-    ("regarding ", "re:"),
-    ("related to ", "~"),
-    ("assigned to ", "@"),
-    ("responsible for ", "owns:"),
-    ("works on ", "→"),
-    ("works at ", "@"),
-    ("started on ", "from:"),
-    ("ended on ", "to:"),
-    ("completed ", "✓"),
-    ("incomplete ", "✗"),
-    ("important", "★"),
+    # Relations
+    ("is a", "="),
+    ("is an", "="),
+    ("is", ":"),
+    ("are", ":"),
+    ("was", "<"),
+    ("were", "<"),
+    ("will be", ">"),
+    ("has", "+"),
+    ("have", "+"),
+    ("had", "+"),
+    ("without", "w/o"),
+    ("with", "w/"),
+    ("regarding", "re:"),
+    ("related to", "~"),
+    ("assigned to", "@"),
+    ("is responsible for", "owns:"),
+    ("responsible for", "owns:"),
+    ("works on", "→"),
+    ("works at", "@"),
+    ("started on", "from:"),
+    ("ended on", "to:"),
+    ("completed", "✓"),
+    ("incomplete", "✗"),
     ("critical", "★★"),
+    ("important", "★"),
     ("high priority", "!!!"),
     ("low priority", "↓"),
-    ("deprecated", "⚠️deprecated"),
     ("breaking change", "💥"),
-    # Architecture
-    ("database", "db"),
+    # Architecture / dev vocabulary
+    ("application programming interface", "API"),
+    ("continuous integration", "CI"),
+    ("continuous deployment", "CD"),
+    ("command line interface", "CLI"),
+    ("artificial intelligence", "AI"),
+    ("machine learning", "ML"),
+    ("user interface", "UI"),
+    ("pull requests", "PRs"),
+    ("pull request", "PR"),
     ("authentication", "auth"),
     ("authorization", "authz"),
     ("configuration", "cfg"),
+    ("databases", "dbs"),
+    ("database", "db"),
+    ("environments", "envs"),
     ("environment", "env"),
+    ("repositories", "repos"),
     ("repository", "repo"),
-    ("pull request", "PR"),
-    ("continuous integration", "CI"),
-    ("continuous deployment", "CD"),
-    ("application programming interface", "API"),
-    ("user interface", "UI"),
-    ("command line interface", "CLI"),
-    ("machine learning", "ML"),
-    ("artificial intelligence", "AI"),
+    ("dependencies", "deps"),
+    ("dependency", "dep"),
+    ("documentation", "docs"),
+    ("implementation", "impl"),
+    ("information", "info"),
+    ("functions", "fns"),
+    ("function", "fn"),
+    ("parameters", "params"),
+    ("parameter", "param"),
+    ("arguments", "args"),
+    ("argument", "arg"),
+    ("directories", "dirs"),
+    ("directory", "dir"),
+    ("development", "dev"),
+    ("production", "prod"),
+    ("kubernetes", "k8s"),
+    ("javascript", "JS"),
+    ("typescript", "TS"),
+    ("messages", "msgs"),
+    ("message", "msg"),
+    ("requests", "reqs"),
+    ("request", "req"),
+    ("responses", "resps"),
+    ("response", "resp"),
+    ("version", "v"),
 ]
 
-# Pre-compiled for speed
+# Filler words dropped entirely. Lossy, which is fine: drawers keep the
+# original text and ES is only used for compact context.
+FILLER_WORDS: tuple[str, ...] = (
+    "the", "a", "an", "that", "very", "really", "just", "basically",
+    "actually", "currently", "also", "quite", "simply",
+)
+
+# Replacements that read as operators are written without surrounding spaces.
+_TIGHT = {"&", "|", ":", "=", "<", ">", "+", "→", "←", "∴", "∵", "≠", "≥", "≤", "≈", "@", "~"}
+
+
+def _word_pattern(phrase: str) -> str:
+    """Regex for *phrase* as whole words, allowing any whitespace between words."""
+    return r"(?<![\w])" + r"\s+".join(re.escape(w) for w in phrase.split()) + r"(?![\w])"
+
+
 _COMPRESS_PATTERNS: list[tuple[re.Pattern, str]] = [
-    (re.compile(re.escape(src), re.IGNORECASE), dst)
-    for src, dst in SYMBOL_TABLE
+    (
+        re.compile(r"[ \t]*" + _word_pattern(src) + r"[ \t]*", re.IGNORECASE)
+        if dst in _TIGHT
+        else re.compile(_word_pattern(src), re.IGNORECASE),
+        dst,
+    )
+    # Longest phrases first, so "is responsible for" wins over "is".
+    for src, dst in sorted(SYMBOL_TABLE, key=lambda p: (-len(p[0].split()), -len(p[0])))
 ]
 
-_DECOMPRESS_PATTERNS: list[tuple[re.Pattern, str]] = [
-    (re.compile(re.escape(dst)), src)
-    for src, dst in reversed(SYMBOL_TABLE)
-    if dst  # skip empty-string replacements (article stripping is lossy)
-]
+_FILLER_PATTERN = re.compile(
+    r"(?<![\w])(?:" + "|".join(FILLER_WORDS) + r")(?![\w])[ \t]*", re.IGNORECASE
+)
+
+# decompress() only expands symbols that cannot appear in ordinary text.
+# ASCII operators such as ":" "|" "&" "<" are left alone, because expanding
+# them would corrupt URLs, code, tables and normal punctuation.
+_EXPANSIONS: dict[str, str] = {
+    "∴": "therefore", "∵": "because", "→": "leads to", "←": "caused by",
+    "≠": "not equal to", "≥": "greater than or equal to",
+    "≤": "less than or equal to", "≈": "approximately", "∞": "infinity",
+    "¬": "not ", "✓": "completed ", "✗": "incomplete ", "💥": "breaking change",
+}
+_DECOMPRESS_PATTERN = re.compile("|".join(re.escape(k) for k in _EXPANSIONS))
 
 # ---------------------------------------------------------------------------
 # Code-aware patterns
@@ -192,6 +266,49 @@ def annotate_confidence(text: str, weight: int) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Prose and code passes
+# ---------------------------------------------------------------------------
+
+# URLs, `inline code`, and tokens like auth.py or src/app are never rewritten.
+_PROTECTED = re.compile(r"`[^`]*`|\S+://\S+|\S*\w[/\\.]\w\S*")
+
+
+def _compress_prose(text: str) -> str:
+    protected: list[str] = []
+
+    def _hide(m: re.Match) -> str:
+        protected.append(m.group(0))
+        return f"\x00{len(protected) - 1}\x00"
+
+    text = _PROTECTED.sub(_hide, text)
+    for pattern, repl in _COMPRESS_PATTERNS:
+        text = pattern.sub(repl, text)
+    text = _FILLER_PATTERN.sub("", text)
+    text = re.sub(r"\x00(\d+)\x00", lambda m: protected[int(m.group(1))], text)
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    text = re.sub(r" +([.,;!?])", r"\1", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
+
+def _compress_code(text: str) -> str:
+    """Compact code: short signatures, one space per indent level, no blank lines.
+
+    The English symbol table is not applied, so identifiers and operators in
+    the code are left untouched.
+    """
+    text = _compress_code_signature(text)
+    lines = []
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        stripped = line.lstrip(" ")
+        indent = len(line) - len(stripped)
+        lines.append(" " * (indent // 4 + (1 if indent % 4 else 0)) + stripped.rstrip())
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -213,16 +330,9 @@ def compress(text: str, is_code: bool = False, is_diff: bool = False,
         return _compress_diff(text, diff_filename)
 
     if is_code:
-        text = _compress_code_signature(text)
-
-    # Apply symbol table substitutions (longest first to avoid partial matches)
-    for pattern, repl in _COMPRESS_PATTERNS:
-        text = pattern.sub(repl, text)
-
-    # Strip redundant whitespace
-    text = re.sub(r"[ \t]{2,}", " ", text)
-    text = re.sub(r"\n{3,}", "\n\n", text)
-    text = text.strip()
+        text = _compress_code(text)
+    else:
+        text = _compress_prose(text)
 
     if confidence is not None:
         text = annotate_confidence(text, confidence)
@@ -246,9 +356,10 @@ def decompress(text: str) -> str:
     # Reverse code signatures
     text = _decompress_code_signature(text)
 
-    # Reverse symbol table (applied in reverse order)
-    for pattern, repl in _DECOMPRESS_PATTERNS:
-        text = pattern.sub(repl, text)
+    # Expand unambiguous symbols, keeping words separated by single spaces
+    text = _DECOMPRESS_PATTERN.sub(lambda m: f" {_EXPANSIONS[m.group(0)].strip()} ", text)
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    text = re.sub(r" +([.,;!?])", r"\1", text)
 
     # Remove confidence stars if present
     text = re.sub(r"\s*\[★+\]$", "", text)
