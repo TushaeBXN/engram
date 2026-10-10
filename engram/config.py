@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -30,16 +31,21 @@ def ensure_engram_dir() -> None:
 
 
 def load_config() -> dict[str, Any]:
-    """Load config from ~/.engram/config.json, merging with defaults."""
+    """Load config from ~/.engram/config.json, merging with defaults.
+
+    ``ENGRAM_VECTOR_BACKEND`` overrides ``vector_backend`` without editing the file.
+    """
     ensure_engram_dir()
+    cfg = dict(DEFAULT_CONFIG)
     if CONFIG_PATH.exists():
         try:
             with CONFIG_PATH.open() as f:
-                on_disk = json.load(f)
-            return {**DEFAULT_CONFIG, **on_disk}
+                cfg.update(json.load(f))
         except (json.JSONDecodeError, OSError):
             pass
-    return dict(DEFAULT_CONFIG)
+    if os.environ.get("ENGRAM_VECTOR_BACKEND"):
+        cfg["vector_backend"] = os.environ["ENGRAM_VECTOR_BACKEND"]
+    return cfg
 
 
 def save_config(cfg: dict[str, Any]) -> None:
