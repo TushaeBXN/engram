@@ -6,7 +6,7 @@
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-106%20passed-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-121%20passed-brightgreen)]()
 
 Engram is a **local-first, open-source AI memory system**. It solves one problem: AI sessions end, but your work doesn't. Every decision, debug session, and architecture choice you've had with an AI disappears the moment the conversation closes. Engram makes it permanent, searchable, and retrievable in ~170 tokens.
 
