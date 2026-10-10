@@ -491,7 +491,7 @@ Engram is published to PyPI as **`engram-chateau`** (the command and `import eng
 
 One-time setup (maintainer, on pypi.org): *Account settings → Publishing → Add a new pending publisher* with PyPI project name `engram-chateau`, owner `TushaeBXN`, repository `engram`, workflow `publish.yml`, environment `pypi`.
 
-To release: bump `version` in `pyproject.toml` and `__version__` in `engram/__init__.py`, merge, then publish a GitHub release tagged `v<version>` (for example `v1.0.0`). The workflow checks the tag matches both, runs the tests, builds, and uploads.
+To release: bump `version` in `pyproject.toml` and `__version__` in `engram/__init__.py`, merge, then publish a GitHub release tagged `v<version>` (for example `v1.1.0`). The workflow checks the tag matches both, runs the tests, builds, and uploads.
 
 ---
 
