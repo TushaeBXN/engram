@@ -2,51 +2,49 @@
 <img width="1408" height="768" alt="Gemini_Generated_Image_9nr9z59nr9z59nr9" src="https://github.com/user-attachments/assets/e04422f2-1974-48c2-8568-238bc2641bdf" />
 
 
-> **The AI memory layer that never forgets.**
+> **Small, private, verbatim memory for your AI — set up in a minute, readable in an afternoon.**
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/)
 [![CI](https://github.com/TushaeBXN/engram/actions/workflows/ci.yml/badge.svg)](https://github.com/TushaeBXN/engram/actions/workflows/ci.yml)
 
-Engram is a **local-first, open-source AI memory system**. It solves one problem: AI sessions end, but your work doesn't. Every decision, debug session, and architecture choice you've had with an AI disappears the moment the conversation closes. Engram makes it permanent, searchable, and retrievable in ~170 tokens.
+Engram gives Claude (and any MCP client) a long-term memory that lives on your machine. It keeps every note, file and conversation **word for word**, organises them into wings and rooms, and finds them again with semantic search. No cloud, no API key, no account.
 
-Everything lives on your machine. No cloud. No API key required to run.
+## Why Engram
 
----
+- **Small enough to read.** About 6,300 lines of Python in 33 files. You can audit everything that touches your data in an afternoon.
+- **Two commands to set up.** Install, run `engram install-hooks`, and Claude Code saves your work and conversations automatically.
+- **Verbatim, not summarised.** Drawers store your original text. Compression is only used for the small context Engram loads into a model.
+- **Private by default.** Everything stays under `~/.engram/`. Nothing is sent anywhere.
+- **Honest numbers.** Benchmarks are reproducible from this repo, and unmeasured goals are labelled as goals ([details](#benchmark-targets)).
 
-## Web UI
+## Set up in 60 seconds
 
 ```bash
-pip install git+https://github.com/TushaeBXN/engram
-engram ui          # opens http://127.0.0.1:7741 in your browser
+pip install git+https://github.com/TushaeBXN/engram   # Python 3.9+
+engram init ~/myproject                                # create your memory château
+engram install-hooks                                   # auto-save from Claude Code (prints a settings.json snippet)
+claude mcp add engram -- python -m engram.mcp_server   # give Claude the 22 engram_* tools
 ```
-<img width="1126" height="932" alt="Screenshot 2026-09-22 at 10 59 38 AM" src="https://github.com/user-attachments/assets/870d76e7-bdc3-42a5-9056-6a54a1dd7ef1" />
 
-A **force-directed knowledge graph** that maps every note and the connections between them — built into the package, no configuration needed.
+Then ask Claude to search or remember things, or use the CLI: `engram mine ~/myproject --wing myapp`, `engram search "auth decisions"`.
 
-[Engram Web UI]
+## Engram and MemPalace
 
-- **Knowledge graph** — live force-directed view; hover any node for a preview card
-- **`[[Wikilinks]]`** — type `[[` to autocomplete note titles; links become graph edges instantly  
-- **Wing tabs** — work / personal / ideas / journal, each with its own color and note count
-- **Tag filtering** — click any `#tag` chip to filter the notes list
-- **Pin notes** — float important notes to the top with a purple accent bar
-- **Daily journal** — one click opens or creates today's dated entry
-- **Markdown editor** — live preview, word count, ⌘S to save, ⌘N for a new note
-- **Export / Import** — full JSON round-trip; nothing ever leaves your machine
+Engram's design (wings, rooms, halls, drawers, a temporal knowledge graph) is inspired by [MemPalace](https://github.com/MemPalace/mempalace), a much larger and more mature project. If you need a shared memory hub across machines, Docker images, GPU embedding models, LLM reranking or its published benchmark results, use MemPalace. Engram aims to be the small one: the same core ideas in a codebase one person can read, with a two-line setup.
 
 ---
 
-## Why Engram?
+## Why local memory?
 
 | | Engram | Cloud memory tools |
 |---|---|---|
-| Cold-start context | **~170 tokens** | 500+ tokens |
-| Install | One `pip install` (from GitHub) | Docker + cloud signup |
-| API key required | **No** | Yes |
-| Data leaves your machine | **Never** | Always |
-| Compression | **ES shorthand** for context (~1.6× on prose) | None |
-| Open source | **MIT** | Proprietary |
+| Cold-start context | Designed for **~170 tokens** (L0 + L1, not yet measured) | Varies |
+| Install | One `pip install` (from GitHub) | Often Docker + cloud signup |
+| API key required | **No** | Usually |
+| Data leaves your machine | **Never** | Yes |
+| Compression | **ES shorthand** for context (~1.6× on prose) | — |
+| Open source | **MIT** | Often proprietary |
 
 ---
 
@@ -136,13 +134,13 @@ Total cold-start context: **~170 tokens** (L0 + L1 only).
 
 ## Using with Claude via MCP
 
-Start the MCP server:
+**Claude Code:**
 
 ```bash
-python -m engram.mcp_server
+claude mcp add engram -- python -m engram.mcp_server
 ```
 
-Add to `~/.config/claude/claude_desktop_config.json`:
+**Claude Desktop:** add this to `claude_desktop_config.json` (macOS: `~/Library/Application Support/Claude/`, Windows: `%APPDATA%\Claude\`):
 
 ```json
 {
@@ -154,6 +152,8 @@ Add to `~/.config/claude/claude_desktop_config.json`:
   }
 }
 ```
+
+Use the full path to the Python that has Engram installed if `python` on your PATH is a different one.
 
 Claude will then have access to all 22 `engram_*` tools including `engram_wake_up`,
 `engram_search`, `engram_add_memory`, `engram_kg_add`, `engram_replay`, and more.
@@ -441,6 +441,19 @@ Merge the printed snippet into `~/.claude/settings.json`. It looks like:
 ```
 
 Optional environment variables: `ENGRAM_WING` (default `default`), `ENGRAM_ROOM` for transcripts (default `conversation`), `ENGRAM_AGENT` for diary entries (default `claude-code`).
+
+---
+
+## Web UI (notes)
+
+```bash
+engram ui          # opens http://127.0.0.1:7741 in your browser
+```
+<img width="1126" height="932" alt="Engram notes UI with knowledge graph" src="https://github.com/user-attachments/assets/870d76e7-bdc3-42a5-9056-6a54a1dd7ef1" />
+
+A local notes app with a force-directed graph of your notes and their `[[wikilinks]]`: wing tabs, `#tag` filters, pinned notes, a daily journal, a Markdown editor, and JSON export/import.
+
+> **Note:** the UI keeps its notes in your browser's local storage. It does not yet show the memories Engram stores in `~/.engram/` (mined files, conversations, MCP memories). Use `engram search`, `engram replay` or the MCP tools for those.
 
 ---
 
