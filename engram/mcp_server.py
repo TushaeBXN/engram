@@ -38,6 +38,8 @@ import sys
 import traceback
 from typing import Any
 
+from engram import __version__
+
 # ---------------------------------------------------------------------------
 # MCP protocol helpers (minimal stdio JSON-RPC implementation)
 # ---------------------------------------------------------------------------
@@ -481,7 +483,7 @@ def _handle_message(server: EngramMCPServer, msg: dict) -> dict | None:
         return _result(id_, {
             "protocolVersion": "2024-11-05",
             "capabilities": {"tools": {}},
-            "serverInfo": {"name": "engram", "version": "1.0.0"},
+            "serverInfo": {"name": "engram", "version": __version__},
         })
 
     if method == "tools/list":

@@ -71,17 +71,17 @@ These are goals, not results. ES compression is measured today; the LongMemEval 
 
 ## Quick Start
 
-> **Note:** the `engram` package on PyPI is an unrelated project. Install Engram from GitHub as shown below, not with `pip install engram`.
+> **Note:** the `engram` package on PyPI is an unrelated project. Install Engram from GitHub as shown below, not with `pip install engram`. Engram's own PyPI package will be **`engram-chateau`**; the command stays `engram`.
 
 ```bash
 # Install (from GitHub; Engram is not on PyPI yet)
 pip install git+https://github.com/TushaeBXN/engram
 
 # Or with optional backends
-pip install "engram[faiss] @ git+https://github.com/TushaeBXN/engram"       # FAISS speed backend
-pip install "engram[sqlitevec] @ git+https://github.com/TushaeBXN/engram"   # zero-dependency fallback
-pip install "engram[viz] @ git+https://github.com/TushaeBXN/engram"         # graph visualisation (matplotlib + networkx)
-pip install "engram[all] @ git+https://github.com/TushaeBXN/engram"         # everything
+pip install "engram-chateau[faiss] @ git+https://github.com/TushaeBXN/engram"       # FAISS speed backend
+pip install "engram-chateau[sqlitevec] @ git+https://github.com/TushaeBXN/engram"   # zero-dependency fallback
+pip install "engram-chateau[viz] @ git+https://github.com/TushaeBXN/engram"         # graph visualisation (matplotlib + networkx)
+pip install "engram-chateau[all] @ git+https://github.com/TushaeBXN/engram"         # everything
 
 # Initialise your memory château
 engram init ~/myproject
@@ -278,7 +278,7 @@ engram provenance --summary                    # source counts across château
 ### Graph Visualisation
 
 ```bash
-pip install "engram[viz] @ git+https://github.com/TushaeBXN/engram"
+pip install "engram-chateau[viz] @ git+https://github.com/TushaeBXN/engram"
 engram graph                                   # all wings → memory_graph.png
 engram graph --wing myapp --output myapp.png   # scoped to one wing
 ```
@@ -457,7 +457,7 @@ Optional environment variables: `ENGRAM_WING` (default `default`), `ENGRAM_ROOM`
 Optional:
 - `faiss-cpu` — FAISS backend
 - `sqlite-vec` — sqlite-vec backend
-- `matplotlib` + `networkx` — graph visualisation (`pip install "engram[viz] @ git+https://github.com/TushaeBXN/engram"`)
+- `matplotlib` + `networkx` — graph visualisation (`pip install "engram-chateau[viz] @ git+https://github.com/TushaeBXN/engram"`)
 - `requests` — Ollama API calls for `engram answer`
 
 No API key. No internet after install.
@@ -471,6 +471,14 @@ No API key. No internet after install.
 3. `pre-commit install`
 4. Run tests: `pytest tests/ -v`
 5. Submit a PR
+
+### Releasing
+
+Engram is published to PyPI as **`engram-chateau`** (the command and `import engram` are unchanged). Publishing runs from `.github/workflows/publish.yml` using PyPI trusted publishing, so no API token is stored anywhere.
+
+One-time setup (maintainer, on pypi.org): *Account settings → Publishing → Add a new pending publisher* with PyPI project name `engram-chateau`, owner `TushaeBXN`, repository `engram`, workflow `publish.yml`, environment `pypi`.
+
+To release: bump `version` in `pyproject.toml` and `__version__` in `engram/__init__.py`, merge, then publish a GitHub release tagged `v<version>` (for example `v1.0.0`). The workflow checks the tag matches both, runs the tests, builds, and uploads.
 
 ---
 
