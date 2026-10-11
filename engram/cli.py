@@ -166,10 +166,13 @@ def cmd_search(
     room: Optional[str] = typer.Option(None, "--room", "-r"),
     n: int = typer.Option(10, "--results", "-n", help="Max results."),
     no_decay: bool = typer.Option(False, "--no-decay", help="Disable recency weighting."),
+    hybrid: bool = typer.Option(False, "--hybrid", help="Boost results that share the query's keywords."),
+    hybrid_weight: float = typer.Option(0.3, "--hybrid-weight", help="Keyword boost weight used with --hybrid."),
 ):
     """Semantic search across the château."""
     searcher = _searcher()
-    results = searcher.search(query, n=n, wing=wing, room=room, no_decay=no_decay)
+    results = searcher.search(query, n=n, wing=wing, room=room, no_decay=no_decay,
+                              hybrid_weight=hybrid_weight if hybrid else None)
 
     if not results:
         console.print("[yellow]No results found.[/yellow]")

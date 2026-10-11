@@ -1,11 +1,16 @@
-"""Semantic search with recency weighting.
+"""Semantic search with recency weighting and optional keyword boosting.
 
 Score formula::
 
-    final_score = semantic_score * (1 + recency_boost)
+    final_score = semantic_score * (1 + recency_boost) * (1 + hybrid_weight * keyword_overlap)
     recency_boost = decay_factor * max(0, decay_max_days - age_days)
+    keyword_overlap = share of the query's keywords that appear in the hit
 
 Pinned drawers bypass decay and always receive a 1.0 recency multiplier.
+Hybrid search is off by default (``hybrid_weight`` 0). Turn it on with the
+``hybrid_weight`` config key, ``engram search --hybrid`` or the
+``hybrid_weight`` argument. It helps when a query names exact things (people,
+products, numbers) that embeddings blur together.
 
 Usage::
 
@@ -15,6 +20,7 @@ Usage::
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -53,6 +59,7 @@ class Searcher:
         room: Optional[str] = None,
         hall: Optional[str] = None,
         no_decay: bool = False,
+        hybrid_weight: Optional[float] = None,
     ) -> list[dict]:
         """Semantic search with optional recency weighting.
 
@@ -63,6 +70,8 @@ class Searcher:
             room:     Filter to this room.
             hall:     Filter to this hall type.
             no_decay: If True, disable recency weighting.
+            hybrid_weight: Keyword boost weight; None uses the config's
+                      ``hybrid_weight`` (default 0, semantic only).
 
         Returns:
             List of result dicts sorted by final_score descending::
@@ -73,6 +82,7 @@ class Searcher:
                     "metadata": dict,
                     "semantic_score": float,
                     "recency_boost": float,
+                    "keyword_overlap": float,
                     "final_score": float,
                     "pinned": bool,
                 }
@@ -83,6 +93,9 @@ class Searcher:
 
         decay_factor = self.config.get("decay_factor", 0.005)
         decay_max_days = self.config.get("decay_max_days", 90)
+        if hybrid_weight is None:
+            hybrid_weight = float(self.config.get("hybrid_weight", 0.0))
+        query_kw = keywords(query) if hybrid_weight else set()
 
         scored = []
         for hit in raw:
@@ -98,6 +111,9 @@ class Searcher:
 
             sem = hit.get("score", 0.0)
             final = sem * (1.0 + recency_boost)
+            overlap = keyword_overlap(query_kw, hit["text"]) if query_kw else 0.0
+            if final > 0:
+                final *= 1.0 + hybrid_weight * overlap
 
             scored.append(
                 {
@@ -106,6 +122,7 @@ class Searcher:
                     "metadata": meta,
                     "semantic_score": round(sem, 4),
                     "recency_boost": round(recency_boost, 4),
+                    "keyword_overlap": round(overlap, 4),
                     "final_score": round(final, 4),
                     "pinned": bool(pinned),
                 }
@@ -139,6 +156,62 @@ def _build_where(
     if hall:
         where["hall"] = hall
     return where
+
+
+_WORD = re.compile(r"[a-z0-9]+")
+
+STOPWORDS = frozenset("""
+a about above after again against all also am an and any are as at be because been
+before being below between both but by can could did do does doing done down during
+each few for from further get got had has have having he her here hers herself him
+himself his how i if in into is it its itself just know last let like many me might
+more most much must my myself never no nor not now of off on once one only or other
+our ours ourselves out over own really said same say says she should so some still
+such tell than that the their theirs them themselves then there these they thing
+things this those through to too under until up us use used very was way we well
+were what when where which while who whom why will with would yes yet you your
+yours yourself yourselves ago day days time recently remember mentioned told
+""".split())
+
+
+def _stem(word: str) -> str:
+    """Very light suffix stripping so "tomatoes"/"tomato", "booked"/"book" and
+    "loved"/"love" reduce to the same key. Not a real stemmer, just enough to
+    stop plurals and tenses from hiding a match."""
+    if word.isdigit() or len(word) <= 3:
+        return word
+    if word.endswith(("ies", "ied")) and len(word) > 4:
+        word = word[:-3] + "y"
+    elif word.endswith(("sses", "xes", "ches", "shes", "oes", "zes")):
+        word = word[:-2]
+    elif word.endswith(("ing", "ed")) and len(word) > 4 + (word[-1] == "g"):
+        word = word[:-3] if word.endswith("ing") else word[:-2]
+        if len(word) > 2 and word[-1] == word[-2] and word[-1] not in "lsz":
+            word = word[:-1]  # running -> run, planned -> plan
+    elif word.endswith("s") and not word.endswith("ss"):
+        word = word[:-1]
+    if word.endswith("e") and len(word) > 3:
+        word = word[:-1]
+    return word
+
+
+def keywords(text: str) -> set[str]:
+    """Content words of *text*: lower-cased, stopwords dropped, lightly stemmed.
+
+    Words shorter than three letters are dropped unless they contain a digit
+    (years, quantities, versions).
+    """
+    return {
+        _stem(w) for w in _WORD.findall(text.lower())
+        if w not in STOPWORDS and (len(w) >= 3 or any(c.isdigit() for c in w))
+    }
+
+
+def keyword_overlap(query_keywords: set[str], text: str) -> float:
+    """Fraction of *query_keywords* that occur in *text* (0.0 to 1.0)."""
+    if not query_keywords:
+        return 0.0
+    return len(query_keywords & keywords(text)) / len(query_keywords)
 
 
 def _age_days(timestamp: str) -> float:
