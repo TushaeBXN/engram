@@ -24,7 +24,7 @@ from typing import Optional
 from engram.chateau import Chateau, Drawer
 from engram.classifier import classify_hall
 from engram.config import load_config
-from engram.indexing import index_drawer
+from engram.indexing import index_drawers
 
 # ---------------------------------------------------------------------------
 # Format detectors
@@ -252,15 +252,26 @@ class ConvoMiner:
         return drawers
 
     def store_messages(self, messages: list[dict], wing: str, room: str) -> list[Drawer]:
-        """Store already-parsed messages ({"role", "text", "timestamp"[, "id"]})."""
-        drawers = []
+        """Store already-parsed messages ({"role", "text", "timestamp"[, "id"]}).
+
+        Drawers are written first, then indexed in one batched call.
+        """
+        drawers, new, replaced = [], [], []
         for msg in messages:
-            d = self._store_message(msg, wing, room)
-            if d:
-                drawers.append(d)
+            stored = self._save_message(msg, wing, room)
+            if stored:
+                drawer, meta, existed = stored
+                drawers.append(drawer)
+                (replaced if existed else new).append((drawer.id, drawer.content, meta))
+        index_drawers(self.backend, replaced, replace=True)
+        index_drawers(self.backend, new, replace=False)
         return drawers
 
     def _store_message(self, msg: dict, wing: str, room: str) -> Optional[Drawer]:
+        drawers = self.store_messages([msg], wing, room)
+        return drawers[0] if drawers else None
+
+    def _save_message(self, msg: dict, wing: str, room: str):
         text = msg["text"]
         if len(text) < 20:
             return None
@@ -275,21 +286,16 @@ class ConvoMiner:
             timestamp=msg["timestamp"] or datetime.now(timezone.utc).isoformat(),
             tags=["conversation", msg["role"]],
         )
-        self.palace.delete_drawer_by_id(drawer.id)
+        existed = self.palace.delete_drawer_by_id(drawer.id) > 0
         self.palace.save_drawer(drawer)
-        index_drawer(
-            self.backend,
-            drawer.id,
-            text,
-            {
-                "wing": wing,
-                "room": room,
-                "hall": hall,
-                "role": msg["role"],
-                "timestamp": drawer.timestamp,
-            },
-        )
-        return drawer
+        meta = {
+            "wing": wing,
+            "room": room,
+            "hall": hall,
+            "role": msg["role"],
+            "timestamp": drawer.timestamp,
+        }
+        return drawer, meta, existed
 
 
 def _message_id(msg: dict) -> str:

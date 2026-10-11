@@ -35,12 +35,22 @@ class ChromaDBBackend(VectorBackend):
         self._col = self._client.get_or_create_collection(
             name=collection_name,
             metadata={"hnsw:space": "cosine"},
+            embedding_function=_cached_default_embedding_function(),
         )
 
     # ------------------------------------------------------------------
 
     def add(self, id: str, text: str, metadata: dict) -> None:
         self._col.upsert(ids=[id], documents=[text], metadatas=[_sanitise(metadata)])
+
+    def add_many(self, items: list[tuple[str, str, dict]]) -> None:
+        for start in range(0, len(items), _BATCH):
+            batch = items[start:start + _BATCH]
+            self._col.upsert(
+                ids=[i for i, _, _ in batch],
+                documents=[t for _, t, _ in batch],
+                metadatas=[_sanitise(m) for _, _, m in batch],
+            )
 
     def search(self, query: str, n: int = 10, where: dict | None = None) -> list[dict]:
         kwargs: dict[str, Any] = {
@@ -116,3 +126,32 @@ def _chroma_where(where: dict) -> dict:
     if len(where) <= 1:
         return dict(where)
     return {"$and": [{k: v} for k, v in where.items()]}
+
+
+_BATCH = 256
+_EMBEDDING_FUNCTION = None
+
+
+def _cached_default_embedding_function():
+    """ChromaDB's default embedding function with the model loaded once.
+
+    ``DefaultEmbeddingFunction`` builds a new ``ONNXMiniLM_L6_V2`` (and ONNX
+    session) on every call, which made each add ~0.2 s slower. This subclass
+    keeps the same name ("default") and config, so existing collections are
+    unaffected, but reuses one model instance.
+    """
+    global _EMBEDDING_FUNCTION
+    if _EMBEDDING_FUNCTION is None:
+        from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
+        from chromadb.utils.embedding_functions.onnx_mini_lm_l6_v2 import ONNXMiniLM_L6_V2
+
+        class _CachedDefault(DefaultEmbeddingFunction):
+            def __init__(self) -> None:
+                super().__init__()
+                self._model = ONNXMiniLM_L6_V2()
+
+            def __call__(self, input):  # noqa: A002 - signature required by ChromaDB
+                return self._model(input)
+
+        _EMBEDDING_FUNCTION = _CachedDefault()
+    return _EMBEDDING_FUNCTION
