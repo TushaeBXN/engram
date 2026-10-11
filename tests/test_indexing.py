@@ -190,3 +190,15 @@ def test_convo_store_messages_indexes_once_per_call(tmp_path, backend, monkeypat
     assert calls == [5]
     cm.store_messages(msgs, wing="w", room="r")  # re-import: replaced, still no duplicates
     assert backend.count() == 5
+
+
+def test_longmemeval_runner_resume(tmp_path):
+    bench = _bench()
+    sample = ROOT / "tests" / "fixtures" / "longmemeval_sample.json"
+    out = tmp_path / "results.jsonl"
+    bench.run_longmemeval(sample, limit=2, backend="sqlitevec", out=out)
+    first = out.read_text().splitlines()
+    result = bench.run_longmemeval(sample, backend="sqlitevec", out=out, resume=True)
+    rows = out.read_text().splitlines()
+    assert rows[:2] == first and len(rows) == 4
+    assert result["questions"] == 4 and result["recall_any@5"] == 1.0

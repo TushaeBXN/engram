@@ -108,7 +108,7 @@ def _ndcg_any(ranked: list[str], gold: set[str], k: int) -> float:
 
 
 def rank_sessions(entry: dict, workdir: Path, backend_name: str, roles: str,
-                  hybrid_weight: float = 0.0) -> list[str]:
+                  hybrid_weight: float = 0.0, backend=None) -> list[str]:
     """Mine one question's haystack with Engram's pipeline and rank its sessions.
 
     Each haystack session becomes a room; every message goes through
@@ -116,6 +116,7 @@ def rank_sessions(entry: dict, workdir: Path, backend_name: str, roles: str,
     with Searcher, exactly as `engram search` would. Ranked drawers are mapped
     back to their session, keeping each session's best rank. A non-zero
     *hybrid_weight* turns on Engram's keyword boost (``engram search --hybrid``).
+    *backend*, if given, must be empty; otherwise a new one is made in *workdir*.
     """
     from engram.backends import get_backend
     from engram.chateau import Chateau
@@ -123,12 +124,12 @@ def rank_sessions(entry: dict, workdir: Path, backend_name: str, roles: str,
     from engram.searcher import Searcher
 
     palace = Chateau(chateau_path=workdir / "chateau")
-    if backend_name == "chromadb":
+    if backend is None and backend_name == "chromadb":
         backend = get_backend("chromadb", persist_directory=workdir / "chroma",
                               collection_name="bench")
-    elif backend_name == "sqlitevec":
+    elif backend is None and backend_name == "sqlitevec":
         backend = get_backend("sqlitevec", db_path=workdir / "vec.db")
-    else:
+    elif backend is None:
         backend = get_backend(backend_name)
     cfg = {"decay_factor": 0.0, "decay_max_days": 0}
     miner = ConvoMiner(palace, backend, cfg)
@@ -154,12 +155,18 @@ def rank_sessions(entry: dict, workdir: Path, backend_name: str, roles: str,
 
 def run_longmemeval(data_file: Path, limit: int | None = None, backend: str = "chromadb",
                     roles: str = "all", out: Path | None = None,
-                    hybrid_weight: float = 0.0) -> dict:
+                    hybrid_weight: float = 0.0, resume: bool = False) -> dict:
     """Session-level retrieval recall on LongMemEval (same metric as MemPalace's "raw" R@k).
 
     For each question a fresh château and index are built from its haystack
     sessions; a hit is counted at k if any gold answer session ranks in the
     top k (recall_any@k). recall_all@5 and NDCG@10 are reported as well.
+
+    ChromaDB runs share one client and collection, emptied between questions:
+    every ChromaDB client keeps its threads and files open until the process
+    exits, so a client per question crashes long runs (macOS hit its thread
+    limit after ~375 questions). With *resume*, questions already in *out*
+    are counted from that file and skipped.
     """
     data_file = data_file.expanduser()
     if data_file.is_dir():
@@ -173,14 +180,35 @@ def run_longmemeval(data_file: Path, limit: int | None = None, backend: str = "c
 
     totals: dict[str, list[float]] = defaultdict(list)
     by_type: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
-    log = out.open("w") if out else None
+    done: set[str] = set()
+    if resume and out and out.exists():
+        for line in out.read_text().splitlines():
+            row = json.loads(line)
+            done.add(row["question_id"])
+            for name, v in row.items():
+                if name.startswith(("recall_", "ndcg_")):
+                    totals[name].append(v)
+                    by_type[row["question_type"]][name].append(v)
+        if done:
+            print(f"  resuming: {len(done)} questions already in {out}", flush=True)
+    log = out.open("a" if done else "w") if out else None
     t0 = time.time()
+    shared_dir = tempfile.TemporaryDirectory() if backend == "chromadb" else None
+    shared = None
+    if shared_dir:
+        from engram.backends import get_backend
+        shared = get_backend("chromadb", persist_directory=Path(shared_dir.name) / "chroma",
+                             collection_name="bench")
 
     try:
         for i, entry in enumerate(data, 1):
+            if entry["question_id"] in done:
+                continue
             gold = set(entry["answer_session_ids"])
             with tempfile.TemporaryDirectory() as tmp:
-                ranked = rank_sessions(entry, Path(tmp), backend, roles, hybrid_weight)
+                ranked = rank_sessions(entry, Path(tmp), backend, roles, hybrid_weight, shared)
+            if shared:
+                shared.clear()
             scores = {f"recall_any@{k}": float(bool(gold & set(ranked[:k]))) for k in RECALL_KS}
             scores["recall_all@5"] = float(gold <= set(ranked[:5]))
             scores["ndcg_any@10"] = _ndcg_any(ranked, gold, 10)
@@ -198,9 +226,11 @@ def run_longmemeval(data_file: Path, limit: int | None = None, backend: str = "c
     finally:
         if log:
             log.close()
+        if shared_dir:
+            shared_dir.cleanup()
 
     return {
-        "questions": len(data),
+        "questions": len(totals["recall_any@5"]),
         "backend": backend,
         "roles": roles,
         "hybrid_weight": hybrid_weight,
@@ -227,6 +257,8 @@ def main() -> None:
                         help="Boost hits that share the question's keywords (engram search --hybrid)")
     parser.add_argument("--hybrid-weight", type=float, default=0.3,
                         help="Keyword boost weight used with --hybrid (default 0.3)")
+    parser.add_argument("--resume", action="store_true",
+                        help="Skip questions already in --out and count their saved scores")
     parser.add_argument("--compression-only", action="store_true")
     args = parser.parse_args()
 
@@ -251,7 +283,8 @@ def main() -> None:
     print("\n[2/2] LongMemEval retrieval (session recall):")
     lme_results = run_longmemeval(args.data_dir or args.data_file, limit=args.limit,
                                   backend=args.backend, roles=args.roles, out=args.out,
-                                  hybrid_weight=args.hybrid_weight if args.hybrid else 0.0)
+                                  hybrid_weight=args.hybrid_weight if args.hybrid else 0.0,
+                                  resume=args.resume)
     print("  " + json.dumps(lme_results, indent=2))
 
 

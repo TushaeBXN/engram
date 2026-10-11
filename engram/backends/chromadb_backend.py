@@ -93,6 +93,12 @@ class ChromaDBBackend(VectorBackend):
         except Exception:
             pass
 
+    def clear(self) -> None:
+        """Remove every entry from the collection, keeping the client open."""
+        ids = self._col.get(include=[])["ids"]
+        for start in range(0, len(ids), _BATCH):
+            self._col.delete(ids=ids[start:start + _BATCH])
+
     def count(self) -> int:
         try:
             return self._col.count()
