@@ -14,6 +14,7 @@ from engram.indexing import (
     chunk_text,
     drawer_id_of,
     index_drawer,
+    index_drawers,
     unindex_drawer,
 )
 from engram.searcher import Searcher
@@ -133,3 +134,59 @@ def test_ndcg():
     assert ndcg(["a", "b"], {"a"}, 10) == 1.0
     assert 0 < ndcg(["x", "a"], {"a"}, 10) < 1.0
     assert ndcg(["x"], {"a"}, 10) == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Batched indexing
+# ---------------------------------------------------------------------------
+
+def test_index_drawers_batches_into_one_write(backend, monkeypatch):
+    calls = []
+    real = backend.add_many
+    monkeypatch.setattr(backend, "add_many", lambda items: (calls.append(len(items)), real(items)))
+    n = index_drawers(backend, [("a", LONG, {"wing": "w"}), ("b", "short text here", {"wing": "w"})])
+    assert calls == [n] and n == backend.count() > 2
+
+
+def test_index_drawers_replace_false_skips_deletes(backend, monkeypatch):
+    monkeypatch.setattr(backend, "delete_where", lambda where: pytest.fail("should not delete"))
+    index_drawers(backend, [("new", "brand new drawer text", {})], replace=False)
+    assert backend.count() == 1
+
+
+def test_base_add_many_falls_back_to_add():
+    from engram.backends.base import VectorBackend
+
+    class Minimal(VectorBackend):
+        def __init__(self):
+            self.rows = {}
+        def add(self, id, text, metadata):
+            self.rows[id] = text
+        def search(self, query, n=10, where=None):
+            return []
+        def delete(self, id):
+            pass
+        def delete_where(self, where):
+            pass
+        def count(self):
+            return len(self.rows)
+        def update(self, id, text, metadata):
+            self.add(id, text, metadata)
+
+    m = Minimal()
+    m.add_many([("x", "one", {}), ("y", "two", {})])
+    assert m.count() == 2
+
+
+def test_convo_store_messages_indexes_once_per_call(tmp_path, backend, monkeypatch):
+    from engram.convo_miner import ConvoMiner
+    calls = []
+    real = backend.add_many
+    monkeypatch.setattr(backend, "add_many", lambda items: (calls.append(len(items)), real(items)))
+    cm = ConvoMiner(Chateau(chateau_path=tmp_path / "c"), backend, {})
+    msgs = [{"role": "user", "text": f"message number {i} about the deploy", "timestamp": "", "id": f"m{i}"}
+            for i in range(5)]
+    cm.store_messages(msgs, wing="w", room="r")
+    assert calls == [5]
+    cm.store_messages(msgs, wing="w", room="r")  # re-import: replaced, still no duplicates
+    assert backend.count() == 5

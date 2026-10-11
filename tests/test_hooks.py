@@ -146,6 +146,10 @@ class _Backend:
     def delete_where(self, where):
         pass
 
+    def add_many(self, items):
+        for id, text, metadata in items:
+            self.add(id, text, metadata)
+
 
 def test_claude_code_transcript_detection_and_parsing(tmp_path):
     transcript = write_transcript(tmp_path / "session.jsonl")

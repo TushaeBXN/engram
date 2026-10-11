@@ -18,6 +18,11 @@ class VectorBackend(ABC):
         """Embed *text* and store it under *id* with *metadata*."""
         ...
 
+    def add_many(self, items: list[tuple[str, str, dict]]) -> None:
+        """Store several ``(id, text, metadata)`` entries. Backends override this to batch."""
+        for id, text, metadata in items:
+            self.add(id, text, metadata)
+
     @abstractmethod
     def search(self, query: str, n: int = 10, where: dict | None = None) -> list[dict]:
         """Semantic search for *query*.

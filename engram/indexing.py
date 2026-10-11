@@ -65,11 +65,28 @@ def chunk_id(drawer_id: str, n: int) -> str:
 
 def index_drawer(backend: VectorBackend, drawer_id: str, text: str, metadata: dict) -> int:
     """(Re)index *text* for *drawer_id*. Returns the number of chunks stored."""
-    unindex_drawer(backend, drawer_id)
-    chunks = chunk_text(text)
-    for n, chunk in enumerate(chunks):
-        backend.add(chunk_id(drawer_id, n), chunk, {**metadata, "drawer_id": drawer_id, "chunk": n})
-    return len(chunks)
+    return index_drawers(backend, [(drawer_id, text, metadata)])
+
+
+def index_drawers(
+    backend: VectorBackend, drawers: list[tuple[str, str, dict]], replace: bool = True
+) -> int:
+    """Index several ``(drawer_id, text, metadata)`` drawers in one batched write.
+
+    With ``replace=False`` the caller guarantees none of the drawers was indexed
+    before, which skips the per-drawer delete (used for brand-new drawers).
+    Returns the total number of chunks stored.
+    """
+    items = []
+    for drawer_id, text, metadata in drawers:
+        if replace:
+            unindex_drawer(backend, drawer_id)
+        for n, chunk in enumerate(chunk_text(text)):
+            items.append((chunk_id(drawer_id, n), chunk,
+                          {**metadata, "drawer_id": drawer_id, "chunk": n}))
+    if items:
+        backend.add_many(items)
+    return len(items)
 
 
 def unindex_drawer(backend: VectorBackend, drawer_id: str) -> None:

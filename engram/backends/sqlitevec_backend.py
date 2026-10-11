@@ -105,6 +105,14 @@ class SqliteVecBackend(VectorBackend):
         )
         self._conn.commit()
 
+    def add_many(self, items: list[tuple[str, str, dict]]) -> None:
+        rows = [(id, text, json.dumps(meta), self._pack(self._embed(text))) for id, text, meta in items]
+        self._conn.executemany(
+            "INSERT OR REPLACE INTO engram_entries (id, text, metadata, embedding) VALUES (?,?,?,?)",
+            rows,
+        )
+        self._conn.commit()
+
     def search(self, query: str, n: int = 10, where: dict | None = None) -> list[dict]:
         qvec = self._embed(query)
         rows = self._conn.execute(
