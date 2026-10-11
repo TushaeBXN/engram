@@ -153,6 +153,21 @@ def rank_sessions(entry: dict, workdir: Path, backend_name: str, roles: str,
     return ranked
 
 
+def _raise_open_file_limit(target: int = 10240) -> None:
+    """Lift the soft open-file limit (macOS shells default to 256) towards *target*."""
+    try:
+        import resource
+    except ImportError:  # Windows
+        return
+    soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    want = target if hard == resource.RLIM_INFINITY else min(target, hard)
+    if soft != resource.RLIM_INFINITY and soft < want:
+        try:
+            resource.setrlimit(resource.RLIMIT_NOFILE, (want, hard))
+        except (ValueError, OSError):
+            pass
+
+
 def run_longmemeval(data_file: Path, limit: int | None = None, backend: str = "chromadb",
                     roles: str = "all", out: Path | None = None,
                     hybrid_weight: float = 0.0, resume: bool = False) -> dict:
@@ -162,11 +177,13 @@ def run_longmemeval(data_file: Path, limit: int | None = None, backend: str = "c
     sessions; a hit is counted at k if any gold answer session ranks in the
     top k (recall_any@k). recall_all@5 and NDCG@10 are reported as well.
 
-    ChromaDB runs share one client and collection, emptied between questions:
-    every ChromaDB client keeps its threads and files open until the process
-    exits, so a client per question crashes long runs (macOS hit its thread
-    limit after ~375 questions). With *resume*, questions already in *out*
-    are counted from that file and skipped.
+    ChromaDB runs share one client, with a new collection per question that
+    is dropped afterwards. Every ChromaDB client keeps its threads open until
+    the process exits, so a client per question crashes long runs (macOS hit
+    its thread limit after ~375 questions). Reusing one collection and
+    deleting its entries is not an option either: deleted HNSW entries stay
+    in the graph and wreck recall within a few questions. With *resume*,
+    questions already in *out* are counted from that file and skipped.
     """
     data_file = data_file.expanduser()
     if data_file.is_dir():
@@ -194,21 +211,23 @@ def run_longmemeval(data_file: Path, limit: int | None = None, backend: str = "c
     log = out.open("a" if done else "w") if out else None
     t0 = time.time()
     shared_dir = tempfile.TemporaryDirectory() if backend == "chromadb" else None
-    shared = None
     if shared_dir:
         from engram.backends import get_backend
-        shared = get_backend("chromadb", persist_directory=Path(shared_dir.name) / "chroma",
-                             collection_name="bench")
+        _raise_open_file_limit()  # each dropped collection keeps a few files open
 
     try:
         for i, entry in enumerate(data, 1):
             if entry["question_id"] in done:
                 continue
             gold = set(entry["answer_session_ids"])
+            shared = None
+            if shared_dir:
+                shared = get_backend("chromadb", persist_directory=Path(shared_dir.name) / "chroma",
+                                     collection_name=f"bench-{i}")
             with tempfile.TemporaryDirectory() as tmp:
                 ranked = rank_sessions(entry, Path(tmp), backend, roles, hybrid_weight, shared)
             if shared:
-                shared.clear()
+                shared.drop()
             scores = {f"recall_any@{k}": float(bool(gold & set(ranked[:k]))) for k in RECALL_KS}
             scores["recall_all@5"] = float(gold <= set(ranked[:5]))
             scores["ndcg_any@10"] = _ndcg_any(ranked, gold, 10)
