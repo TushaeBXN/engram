@@ -7,8 +7,9 @@ Score formula::
     keyword_overlap = share of the query's keywords that appear in the hit
 
 Pinned drawers bypass decay and always receive a 1.0 recency multiplier.
-Hybrid search is off by default (``hybrid_weight`` 0). Turn it on with the
-``hybrid_weight`` config key, ``engram search --hybrid`` or the
+Hybrid search is on by default (``hybrid_weight`` 0.3 in the default config;
+a config without the key, or ``hybrid_weight`` 0, means semantic only). Change
+it with the ``hybrid_weight`` config key, ``engram search --no-hybrid`` or the
 ``hybrid_weight`` argument. It helps when a query names exact things (people,
 products, numbers) that embeddings blur together.
 
@@ -71,7 +72,7 @@ class Searcher:
             hall:     Filter to this hall type.
             no_decay: If True, disable recency weighting.
             hybrid_weight: Keyword boost weight; None uses the config's
-                      ``hybrid_weight`` (default 0, semantic only).
+                      ``hybrid_weight`` (0.3 in the default config).
 
         Returns:
             List of result dicts sorted by final_score descending::

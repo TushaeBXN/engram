@@ -13,13 +13,14 @@ Python 3.9–3.14 nothing changes. The ChromaDB requirement now starts at 1.0.
 write, and drawers are indexed in batches: about 5.5× faster mining
 (292 → 53 ms per message).
 
-**Hybrid search (opt-in).** `engram search --hybrid`, or `"hybrid_weight": 0.3`
-in `~/.engram/config.json` for the CLI and MCP server, boosts results that
-share the query's keywords. Off by default.
+**Hybrid search, on by default.** Search results that share the query's
+keywords get a boost (`hybrid_weight` 0.3). On LongMemEval it raised R@5 from
+0.968 to 0.974 and made no question type worse. Turn it off with
+`engram search --no-hybrid` or `"hybrid_weight": 0` in `~/.engram/config.json`.
 
-**LongMemEval results published.** R@5 0.968 and R@10 0.986 on all 500
-questions with the default setup (local embeddings, no LLM); see
-`benchmarks/BENCHMARKS.md`. The runner gained `--hybrid`, `--resume`, and a
+**LongMemEval results published.** R@5 0.974 and R@10 0.988 on all 500
+questions with the default setup (local embeddings, no LLM), against 0.966
+for MemPalace's raw mode; see `benchmarks/BENCHMARKS.md`. The runner gained `--hybrid`, `--resume`, and a
 fix for long runs that crashed (thread exhaustion) or lost recall (reused
 ChromaDB collections).
 

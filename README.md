@@ -4,6 +4,8 @@
 
 > **Small, private, verbatim memory for your AI — set up in a minute, readable in an afternoon.**
 
+**97.4% R@5 on LongMemEval, ahead of MemPalace's raw mode (96.6%), with no AI model and no API calls. Free, local, one `pip install`.** ([results](#engram-and-mempalace))
+
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/)
 [![CI](https://github.com/TushaeBXN/engram/actions/workflows/ci.yml/badge.svg)](https://github.com/TushaeBXN/engram/actions/workflows/ci.yml)
@@ -31,7 +33,22 @@ Then ask Claude to search or remember things, or use the CLI: `engram mine ~/myp
 
 ## Engram and MemPalace
 
-Engram's design (wings, rooms, halls, drawers, a temporal knowledge graph) is inspired by [MemPalace](https://github.com/MemPalace/mempalace), a much larger and more mature project. If you need a shared memory hub across machines, Docker images, GPU embedding models, LLM reranking or its published benchmark results, use MemPalace. Engram aims to be the small one: the same core ideas in a codebase one person can read, with a two-line setup.
+Engram's design (wings, rooms, halls, drawers, a temporal knowledge graph) is inspired by [MemPalace](https://github.com/MemPalace/mempalace), a much larger and more mature project. Engram aims to be the small one: the same core ideas in a codebase one person can read, with a two-line setup. Here is how the two compare on LongMemEval (500 questions, session-level R@5: is the right conversation in the top 5 results?):
+
+| LongMemEval R@5 | Engram | MemPalace |
+|---|---|---|
+| Semantic search only, no AI model | **96.8%** | 96.6% |
+| Hybrid search, no AI model | **97.4%** (Engram's default) | **98.4%** (held-out 450 questions) |
+| Hybrid + AI reranking | not offered | ≥ 99% |
+| R@10 (semantic / hybrid) | 98.6% / 98.8% | — |
+
+Engram's numbers come from one full run each on a Mac mini with the default local embedding model (all-MiniLM-L6-v2); MemPalace's are from [its README](https://github.com/MemPalace/mempalace#benchmarks). The setups differ, so read this as "level on raw retrieval":
+
+- Engram indexes assistant messages as well as yours; MemPalace's raw mode indexes your messages only. That is why Engram answers every "what did you tell me about…" question.
+- Engram's hybrid search is a keyword boost only. MemPalace's hybrid v4 also boosts by time and by your stated preferences, and leads by one point there.
+- One question is worth 0.2 points.
+
+MemPalace also publishes LoCoMo, ConvoMem and MemBench results and offers LLM reranking, a shared memory hub across machines and Docker images; Engram has none of those yet. Every Engram number above is reproducible with the commands in [benchmarks/BENCHMARKS.md](benchmarks/BENCHMARKS.md).
 
 ---
 
@@ -50,12 +67,12 @@ Engram's design (wings, rooms, halls, drawers, a temporal knowledge graph) is in
 
 ## Benchmark Targets
 
-LongMemEval and ES compression are measured; the LoCoMo runner is still a stub. On LongMemEval (500 questions, all-MiniLM-L6-v2 on ChromaDB, no LLM, no reranker, no API calls) Engram puts the right session in the top 5 for **96.8%** of questions (R@10 98.6%). MemPalace reports 96.6% for its raw mode on the same metric; note that Engram indexes assistant messages too, while MemPalace's raw mode indexes user turns only. Per-type breakdown and how to reproduce: [benchmarks/BENCHMARKS.md](benchmarks/BENCHMARKS.md).
+LongMemEval and ES compression are measured; the LoCoMo runner is still a stub. On LongMemEval (500 questions, all-MiniLM-L6-v2 on ChromaDB, no LLM, no reranker, no API calls) Engram's default search puts the right session in the top 5 for **97.4%** of questions and in the top 10 for 98.8% (semantic search alone: 96.8% and 98.6%). See [Engram and MemPalace](#engram-and-mempalace) for the comparison, and [benchmarks/BENCHMARKS.md](benchmarks/BENCHMARKS.md) for the per-type breakdown and how to reproduce.
 
 | Benchmark            | Metric              | Target    | Status                  |
 |----------------------|---------------------|-----------|-------------------------|
-| LongMemEval          | Session recall R@5  | ≥ 0.95    | 0.968 measured          |
-| LongMemEval          | Session recall R@10 | ≥ 0.97    | 0.986 measured          |
+| LongMemEval          | Session recall R@5  | ≥ 0.95    | 0.974 measured          |
+| LongMemEval          | Session recall R@10 | ≥ 0.97    | 0.988 measured          |
 | LoCoMo               | Entity recall       | ≥ 0.72    | Not yet implemented     |
 | LoCoMo               | Event recall        | ≥ 0.69    | Not yet implemented     |
 | ES compression       | Factual paragraphs  | ≥ 1.5×    | 1.6× measured           |
@@ -219,7 +236,7 @@ engram search "query"
 engram search "query" --wing myapp
 engram search "query" --room auth-migration
 engram search "query" --no-decay               # disable recency weighting
-engram search "query" --hybrid                 # also boost hits sharing the query's keywords
+engram search "query" --no-hybrid              # semantic only (keyword boost is on by default)
 engram search "query" --results 20             # max results
 ```
 
@@ -309,10 +326,11 @@ engram split <dir> --dry-run
 
 ```json
 {
-  "palace_path": "~/.engram/palace",
+  "chateau_path": "~/.engram/chateau",
   "vector_backend": "chromadb",
   "decay_factor": 0.005,
   "decay_max_days": 90,
+  "hybrid_weight": 0.3,
   "collection_name": "engram_drawers",
   "people_map": {}
 }
@@ -320,11 +338,11 @@ engram split <dir> --dry-run
 
 | Key              | Default              | Description                                           |
 |------------------|----------------------|-------------------------------------------------------|
-| `palace_path`    | `~/.engram/palace`   | Root of the château filesystem                        |
+| `chateau_path`   | `~/.engram/chateau`  | Root of the château filesystem                        |
 | `vector_backend` | `chromadb`           | `chromadb` \| `faiss` \| `sqlitevec`                  |
 | `decay_factor`   | `0.005`              | Recency boost per day: `score * (1 + factor * days)` |
 | `decay_max_days` | `90`                 | Days after which decay levels off                     |
-| `hybrid_weight`  | `0`                  | Keyword boost: `score * (1 + weight * overlap)`; `0.3` turns on hybrid search everywhere (CLI and MCP) |
+| `hybrid_weight`  | `0.3`                | Keyword boost for hybrid search: `score * (1 + weight * overlap)`; `0` for semantic only (CLI and MCP) |
 | `collection_name`| `engram_drawers`     | ChromaDB collection name                              |
 
 `ENGRAM_VECTOR_BACKEND` overrides `vector_backend` for a single run without editing the file, e.g. `ENGRAM_VECTOR_BACKEND=sqlitevec engram search "auth"`.
