@@ -21,7 +21,7 @@ Engram gives Claude (and any MCP client) a long-term memory that lives on your m
 ## Set up in 60 seconds
 
 ```bash
-pip install git+https://github.com/TushaeBXN/engram   # Python 3.9+
+pip install engram-chateau                            # Python 3.9+ (or: uv tool install engram-chateau)
 engram init ~/myproject                                # create your memory château
 engram install-hooks                                   # auto-save from Claude Code (prints a settings.json snippet)
 claude mcp add engram -- python -m engram.mcp_server   # give Claude the 22 engram_* tools
@@ -40,7 +40,7 @@ Engram's design (wings, rooms, halls, drawers, a temporal knowledge graph) is in
 | | Engram | Cloud memory tools |
 |---|---|---|
 | Cold-start context | Designed for **~170 tokens** (L0 + L1, not yet measured) | Varies |
-| Install | One `pip install` (from GitHub) | Often Docker + cloud signup |
+| Install | One `pip install engram-chateau` | Often Docker + cloud signup |
 | API key required | **No** | Usually |
 | Data leaves your machine | **Never** | Yes |
 | Compression | **ES shorthand** for context (~1.6× on prose) | — |
@@ -69,17 +69,18 @@ These are goals, not results. ES compression is measured today; the LongMemEval 
 
 ## Quick Start
 
-> **Note:** the `engram` package on PyPI is an unrelated project. Install Engram from GitHub as shown below, not with `pip install engram`. Engram's own PyPI package will be **`engram-chateau`**; the command stays `engram`.
+> **Note:** Engram is published on PyPI as **`engram-chateau`**; the command and `import engram` are just `engram`. The package named `engram` on PyPI is an unrelated project.
 
 ```bash
-# Install (from GitHub; Engram is not on PyPI yet)
-pip install git+https://github.com/TushaeBXN/engram
+# Install
+pip install engram-chateau                 # or: uv tool install engram-chateau
+pip install git+https://github.com/TushaeBXN/engram   # latest unreleased code from main
 
 # Or with optional backends
-pip install "engram-chateau[faiss] @ git+https://github.com/TushaeBXN/engram"       # FAISS speed backend
-pip install "engram-chateau[sqlitevec] @ git+https://github.com/TushaeBXN/engram"   # zero-dependency fallback
-pip install "engram-chateau[viz] @ git+https://github.com/TushaeBXN/engram"         # graph visualisation (matplotlib + networkx)
-pip install "engram-chateau[all] @ git+https://github.com/TushaeBXN/engram"         # everything
+pip install "engram-chateau[faiss]"         # FAISS speed backend
+pip install "engram-chateau[sqlitevec]"     # zero-dependency fallback
+pip install "engram-chateau[viz]"           # graph visualisation (matplotlib + networkx)
+pip install "engram-chateau[all]"           # everything
 
 # Initialise your memory château
 engram init ~/myproject
@@ -278,7 +279,7 @@ engram provenance --summary                    # source counts across château
 ### Graph Visualisation
 
 ```bash
-pip install "engram-chateau[viz] @ git+https://github.com/TushaeBXN/engram"
+pip install "engram-chateau[viz]"
 engram graph                                   # all wings → memory_graph.png
 engram graph --wing myapp --output myapp.png   # scoped to one wing
 ```
@@ -470,7 +471,7 @@ A local notes app with a force-directed graph of your notes and their `[[wikilin
 Optional:
 - `faiss-cpu` — FAISS backend
 - `sqlite-vec` — sqlite-vec backend
-- `matplotlib` + `networkx` — graph visualisation (`pip install "engram-chateau[viz] @ git+https://github.com/TushaeBXN/engram"`)
+- `matplotlib` + `networkx` — graph visualisation (`pip install "engram-chateau[viz]"`)
 - `requests` — Ollama API calls for `engram answer`
 
 No API key. No internet after install.
@@ -489,7 +490,7 @@ No API key. No internet after install.
 
 Engram is published to PyPI as **`engram-chateau`** (the command and `import engram` are unchanged). Publishing runs from `.github/workflows/publish.yml` using PyPI trusted publishing, so no API token is stored anywhere.
 
-One-time setup (maintainer, on pypi.org): *Account settings → Publishing → Add a new pending publisher* with PyPI project name `engram-chateau`, owner `TushaeBXN`, repository `engram`, workflow `publish.yml`, environment `pypi`.
+The trusted publisher is configured on pypi.org for project `engram-chateau`: owner `TushaeBXN`, repository `engram`, workflow `publish.yml`, environment `pypi`.
 
 To release: bump `version` in `pyproject.toml` and `__version__` in `engram/__init__.py`, merge, then publish a GitHub release tagged `v<version>` (for example `v1.1.0`). The workflow checks the tag matches both, runs the tests, builds, and uploads.
 
