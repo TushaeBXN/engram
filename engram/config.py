@@ -12,6 +12,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "vector_backend": "chromadb",
     "decay_factor": 0.005,
     "decay_max_days": 90,
+    # Keyword boost on top of semantic search (0 turns it off). 0.3 raised
+    # LongMemEval R@5 from 0.968 to 0.974; see benchmarks/BENCHMARKS.md.
+    "hybrid_weight": 0.3,
     "collection_name": "engram_drawers",
     "people_map": {},
 }

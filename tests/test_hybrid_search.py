@@ -7,6 +7,7 @@ from typer.testing import CliRunner
 
 from engram.chateau import Chateau
 from engram.cli import app
+from engram.config import DEFAULT_CONFIG
 from engram.searcher import Searcher, keyword_overlap, keywords
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -29,7 +30,9 @@ HITS = [
 
 
 def searcher(tmp_path, hits=HITS, config=None):
-    return Searcher(FixedBackend(hits), Chateau(chateau_path=tmp_path / "c"), config or {})
+    # An explicit config: Searcher(config={}) would load ~/.engram/config.json.
+    return Searcher(FixedBackend(hits), Chateau(chateau_path=tmp_path / "c"),
+                    config or {"decay_factor": 0.005})
 
 
 def test_keywords_drop_stopwords_and_normalise_forms():
@@ -46,8 +49,12 @@ def test_keyword_overlap_fraction():
     assert keyword_overlap(set(), "anything") == 0.0
 
 
-def test_hybrid_is_off_by_default(tmp_path):
-    hits = searcher(tmp_path).search("which Subaru Outback did I buy", no_decay=True)
+def test_hybrid_is_on_in_default_config():
+    assert DEFAULT_CONFIG["hybrid_weight"] == 0.3
+
+
+def test_hybrid_is_off_without_config_key(tmp_path):
+    hits = searcher(tmp_path, config={"decay_factor": 0.005}).search("which Subaru Outback did I buy", no_decay=True)
     assert [h["id"] for h in hits] == ["vague", "exact"]
     assert all(h["keyword_overlap"] == 0.0 for h in hits)
     assert hits[0]["final_score"] == hits[0]["semantic_score"]
@@ -86,10 +93,10 @@ def test_cli_search_hybrid_flag(engram_home, tmp_path, monkeypatch):
     monkeypatch.setattr(s, "search", lambda *a, **k: (calls.append(k), real(*a, **k))[1])
     monkeypatch.setattr(cli, "_searcher", lambda *a, **k: s)
     runner = CliRunner()
-    assert runner.invoke(app, ["search", "Subaru Outback"]).exit_code == 0
-    result = runner.invoke(app, ["search", "Subaru Outback", "--hybrid", "--hybrid-weight", "0.5"])
-    assert result.exit_code == 0, result.output
-    assert [c["hybrid_weight"] for c in calls] == [None, 0.5]
+    for args in ([], ["--hybrid", "--hybrid-weight", "0.5"], ["--no-hybrid"]):
+        result = runner.invoke(app, ["search", "Subaru Outback", *args])
+        assert result.exit_code == 0, result.output
+    assert [c["hybrid_weight"] for c in calls] == [None, 0.5, 0.0]
 
 
 def test_longmemeval_runner_hybrid_on_sample():
