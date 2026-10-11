@@ -63,7 +63,7 @@ class EngramWatcher:
 
         console = Console()
         palace = Chateau(self._chateau_path)
-        backend = get_backend(self.config.get("vector_backend", "chromadb"))
+        backend = get_backend(self.config.get("vector_backend", "chromadb"), fallback=True)
         miner = Miner(palace, backend, self.config)
 
         watcher = self
