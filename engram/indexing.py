@@ -73,15 +73,17 @@ def index_drawers(
 ) -> int:
     """Index several ``(drawer_id, text, metadata)`` drawers in one batched write.
 
-    With ``replace=False`` the caller guarantees none of the drawers was indexed
-    before, which skips the per-drawer delete (used for brand-new drawers).
-    Returns the total number of chunks stored.
+    A drawer may carry a fourth element: extra texts indexed as additional
+    chunks of the same drawer (e.g. a preference summary), so a match on them
+    returns the drawer. With ``replace=False`` the caller guarantees none of
+    the drawers was indexed before, which skips the per-drawer delete (used
+    for brand-new drawers). Returns the total number of chunks stored.
     """
     items = []
-    for drawer_id, text, metadata in drawers:
+    for drawer_id, text, metadata, *extra in drawers:
         if replace:
             unindex_drawer(backend, drawer_id)
-        for n, chunk in enumerate(chunk_text(text)):
+        for n, chunk in enumerate(chunk_text(text) + [t for t in (extra[0] if extra else []) if t]):
             items.append((chunk_id(drawer_id, n), chunk,
                           {**metadata, "drawer_id": drawer_id, "chunk": n}))
     if items:

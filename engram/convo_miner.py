@@ -25,6 +25,7 @@ from engram.chateau import Chateau, Drawer
 from engram.classifier import classify_hall
 from engram.config import load_config
 from engram.indexing import index_drawers
+from engram.preferences import preference_summary
 
 # ---------------------------------------------------------------------------
 # Format detectors
@@ -262,7 +263,12 @@ class ConvoMiner:
             if stored:
                 drawer, meta, existed = stored
                 drawers.append(drawer)
-                (replaced if existed else new).append((drawer.id, drawer.content, meta))
+                extra = []
+                if self.config.get("preference_summaries") and msg["role"] in ("human", "user"):
+                    summary = preference_summary(drawer.content)
+                    if summary:
+                        extra.append(summary)
+                (replaced if existed else new).append((drawer.id, drawer.content, meta, extra))
         index_drawers(self.backend, replaced, replace=True)
         index_drawers(self.backend, new, replace=False)
         return drawers

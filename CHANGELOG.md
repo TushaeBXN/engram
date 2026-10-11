@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+**Temporal and preference boosting (opt-in, being measured).**
+- `temporal_weight` (config, default 0): when a query names a time ("two
+  weeks ago", "last month", "yesterday"), memories dated near it get a boost
+  (`engram.temporal`).
+- `preference_summaries` (config, default off): user messages that mention a
+  preference, habit, concern or plan ("I prefer…", "I've been struggling
+  with…", "I'm thinking about…") get a short "User has mentioned: …" summary
+  indexed alongside them, so a later question about that topic finds the
+  message. The stored drawer is unchanged (`engram.preferences`).
+
+Both become defaults only if they raise the LongMemEval score; the runner
+gained `--temporal` and `--preferences`, and messages now carry their
+session's date.
+
 ## 1.2.0
 
 **Installs on any Python 3.9+.** ChromaDB depends on onnxruntime, which has no

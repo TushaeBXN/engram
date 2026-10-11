@@ -343,6 +343,8 @@ engram split <dir> --dry-run
 | `decay_factor`   | `0.005`              | Recency boost per day: `score * (1 + factor * days)` |
 | `decay_max_days` | `90`                 | Days after which decay levels off                     |
 | `hybrid_weight`  | `0.3`                | Keyword boost for hybrid search: `score * (1 + weight * overlap)`; `0` for semantic only (CLI and MCP) |
+| `temporal_weight`| `0`                  | Boost for memories dated near a time the query names ("two weeks ago"); try `0.4` |
+| `preference_summaries` | `false`        | Index a "User has mentioned: …" summary with user messages that state preferences or concerns (applies to newly mined conversations) |
 | `collection_name`| `engram_drawers`     | ChromaDB collection name                              |
 
 `ENGRAM_VECTOR_BACKEND` overrides `vector_backend` for a single run without editing the file, e.g. `ENGRAM_VECTOR_BACKEND=sqlitevec engram search "auth"`.

@@ -2,9 +2,13 @@
 
 Score formula::
 
-    final_score = semantic_score * (1 + recency_boost) * (1 + hybrid_weight * keyword_overlap)
+    final_score = semantic_score * (1 + recency_boost)
+                  * (1 + hybrid_weight * keyword_overlap)
+                  * (1 + temporal_weight * temporal_closeness)
     recency_boost = decay_factor * max(0, decay_max_days - age_days)
     keyword_overlap = share of the query's keywords that appear in the hit
+    temporal_closeness = 1 if the hit is dated near a time the query names
+                         ("two weeks ago"), fading to 0 (engram.temporal)
 
 Pinned drawers bypass decay and always receive a 1.0 recency multiplier.
 Hybrid search is on by default (``hybrid_weight`` 0.3 in the default config;
@@ -29,6 +33,7 @@ from engram.backends.base import VectorBackend
 from engram.chateau import Chateau, Drawer
 from engram.config import load_config
 from engram.indexing import drawer_id_of
+from engram.temporal import temporal_closeness, time_reference
 
 
 class Searcher:
@@ -61,6 +66,8 @@ class Searcher:
         hall: Optional[str] = None,
         no_decay: bool = False,
         hybrid_weight: Optional[float] = None,
+        temporal_weight: Optional[float] = None,
+        now: Optional[datetime] = None,
     ) -> list[dict]:
         """Semantic search with optional recency weighting.
 
@@ -73,6 +80,10 @@ class Searcher:
             no_decay: If True, disable recency weighting.
             hybrid_weight: Keyword boost weight; None uses the config's
                       ``hybrid_weight`` (0.3 in the default config).
+            temporal_weight: Boost for memories near a time the query names
+                      ("two weeks ago", "last month"); None uses the config's
+                      ``temporal_weight``.
+            now:      Reference time for those phrases (default: the current time).
 
         Returns:
             List of result dicts sorted by final_score descending::
@@ -84,6 +95,7 @@ class Searcher:
                     "semantic_score": float,
                     "recency_boost": float,
                     "keyword_overlap": float,
+                    "temporal_closeness": float,
                     "final_score": float,
                     "pinned": bool,
                 }
@@ -97,6 +109,10 @@ class Searcher:
         if hybrid_weight is None:
             hybrid_weight = float(self.config.get("hybrid_weight", 0.0))
         query_kw = keywords(query) if hybrid_weight else set()
+        if temporal_weight is None:
+            temporal_weight = float(self.config.get("temporal_weight", 0.0))
+        time_ref = time_reference(query) if temporal_weight else None
+        now = now or datetime.now(timezone.utc)
 
         scored = []
         for hit in raw:
@@ -113,8 +129,9 @@ class Searcher:
             sem = hit.get("score", 0.0)
             final = sem * (1.0 + recency_boost)
             overlap = keyword_overlap(query_kw, hit["text"]) if query_kw else 0.0
+            closeness = temporal_closeness(ts, now, time_ref) if time_ref else 0.0
             if final > 0:
-                final *= 1.0 + hybrid_weight * overlap
+                final *= (1.0 + hybrid_weight * overlap) * (1.0 + temporal_weight * closeness)
 
             scored.append(
                 {
@@ -124,6 +141,7 @@ class Searcher:
                     "semantic_score": round(sem, 4),
                     "recency_boost": round(recency_boost, 4),
                     "keyword_overlap": round(overlap, 4),
+                    "temporal_closeness": round(closeness, 4),
                     "final_score": round(final, 4),
                     "pinned": bool(pinned),
                 }
