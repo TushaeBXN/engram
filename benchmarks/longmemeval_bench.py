@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 import statistics
 import tempfile
 import time
@@ -107,15 +108,29 @@ def _ndcg_any(ranked: list[str], gold: set[str], k: int) -> float:
     return sum(gains) / ideal if ideal else 0.0
 
 
+def _lme_date(value: str):
+    """LongMemEval dates look like "2023/05/20 (Sat) 02:21"; returns a UTC datetime or None."""
+    from datetime import datetime, timezone
+    m = re.match(r"(\d{4})/(\d{2})/(\d{2})(?:\s*\(\w+\))?\s*(\d{1,2}):(\d{2})", value or "")
+    if not m:
+        return None
+    y, mo, d, h, mi = map(int, m.groups())
+    return datetime(y, mo, d, h, mi, tzinfo=timezone.utc)
+
+
 def rank_sessions(entry: dict, workdir: Path, backend_name: str, roles: str,
-                  hybrid_weight: float = 0.0, backend=None) -> list[str]:
+                  hybrid_weight: float = 0.0, backend=None, temporal_weight: float = 0.0,
+                  preferences: bool = False) -> list[str]:
     """Mine one question's haystack with Engram's pipeline and rank its sessions.
 
     Each haystack session becomes a room; every message goes through
     ConvoMiner (verbatim drawer, chunked index) and the question is answered
     with Searcher, exactly as `engram search` would. Ranked drawers are mapped
     back to their session, keeping each session's best rank. A non-zero
-    *hybrid_weight* turns on Engram's keyword boost (``engram search --hybrid``).
+    *hybrid_weight* turns on Engram's keyword boost (``engram search --hybrid``),
+    *temporal_weight* the boost for sessions dated near a time the question
+    names (relative to the question's date), and *preferences* the preference
+    summaries indexed with user messages. Messages carry their session's date.
     *backend*, if given, must be empty; otherwise a new one is made in *workdir*.
     """
     from engram.backends import get_backend
@@ -131,20 +146,23 @@ def rank_sessions(entry: dict, workdir: Path, backend_name: str, roles: str,
         backend = get_backend("sqlitevec", db_path=workdir / "vec.db")
     elif backend is None:
         backend = get_backend(backend_name)
-    cfg = {"decay_factor": 0.0, "decay_max_days": 0}
+    cfg = {"decay_factor": 0.0, "decay_max_days": 0, "preference_summaries": preferences}
     miner = ConvoMiner(palace, backend, cfg)
 
-    for sess_id, session in zip(entry["haystack_session_ids"], entry["haystack_sessions"]):
+    dates = entry.get("haystack_dates") or [""] * len(entry["haystack_session_ids"])
+    for sess_id, session, date in zip(entry["haystack_session_ids"], entry["haystack_sessions"], dates):
+        when = _lme_date(date)
         messages = [
-            {"role": turn["role"], "text": turn["content"], "timestamp": "",
-             "id": f"{sess_id}:{i}"}
+            {"role": turn["role"], "text": turn["content"],
+             "timestamp": when.isoformat() if when else "", "id": f"{sess_id}:{i}"}
             for i, turn in enumerate(session)
             if roles == "all" or turn["role"] == "user"
         ]
         miner.store_messages(messages, wing="bench", room=sess_id)
 
-    hits = Searcher(backend, palace, cfg).search(entry["question"], n=50, no_decay=True,
-                                                 hybrid_weight=hybrid_weight)
+    hits = Searcher(backend, palace, cfg).search(
+        entry["question"], n=50, no_decay=True, hybrid_weight=hybrid_weight,
+        temporal_weight=temporal_weight, now=_lme_date(entry.get("question_date", "")))
     ranked: list[str] = []
     for hit in hits:
         sid = hit["metadata"].get("room")
@@ -170,7 +188,8 @@ def _raise_open_file_limit(target: int = 10240) -> None:
 
 def run_longmemeval(data_file: Path, limit: int | None = None, backend: str = "chromadb",
                     roles: str = "all", out: Path | None = None,
-                    hybrid_weight: float = 0.0, resume: bool = False) -> dict:
+                    hybrid_weight: float = 0.0, resume: bool = False,
+                    temporal_weight: float = 0.0, preferences: bool = False) -> dict:
     """Session-level retrieval recall on LongMemEval (same metric as MemPalace's "raw" R@k).
 
     For each question a fresh château and index are built from its haystack
@@ -225,7 +244,8 @@ def run_longmemeval(data_file: Path, limit: int | None = None, backend: str = "c
                 shared = get_backend("chromadb", persist_directory=Path(shared_dir.name) / "chroma",
                                      collection_name=f"bench-{i}")
             with tempfile.TemporaryDirectory() as tmp:
-                ranked = rank_sessions(entry, Path(tmp), backend, roles, hybrid_weight, shared)
+                ranked = rank_sessions(entry, Path(tmp), backend, roles, hybrid_weight, shared,
+                                       temporal_weight, preferences)
             if shared:
                 shared.drop()
             scores = {f"recall_any@{k}": float(bool(gold & set(ranked[:k]))) for k in RECALL_KS}
@@ -253,6 +273,8 @@ def run_longmemeval(data_file: Path, limit: int | None = None, backend: str = "c
         "backend": backend,
         "roles": roles,
         "hybrid_weight": hybrid_weight,
+        "temporal_weight": temporal_weight,
+        "preferences": preferences,
         "seconds": round(time.time() - t0, 1),
         **{name: round(statistics.mean(v), 4) for name, v in totals.items()},
         "by_type": {
@@ -276,6 +298,12 @@ def main() -> None:
                         help="Boost hits that share the question's keywords (engram search --hybrid)")
     parser.add_argument("--hybrid-weight", type=float, default=0.3,
                         help="Keyword boost weight used with --hybrid (default 0.3)")
+    parser.add_argument("--temporal", action="store_true",
+                        help="Boost sessions dated near a time the question names (\"two weeks ago\")")
+    parser.add_argument("--temporal-weight", type=float, default=0.4,
+                        help="Boost weight used with --temporal (default 0.4)")
+    parser.add_argument("--preferences", action="store_true",
+                        help="Index a preference summary with each user message")
     parser.add_argument("--resume", action="store_true",
                         help="Skip questions already in --out and count their saved scores")
     parser.add_argument("--compression-only", action="store_true")
@@ -303,7 +331,9 @@ def main() -> None:
     lme_results = run_longmemeval(args.data_dir or args.data_file, limit=args.limit,
                                   backend=args.backend, roles=args.roles, out=args.out,
                                   hybrid_weight=args.hybrid_weight if args.hybrid else 0.0,
-                                  resume=args.resume)
+                                  resume=args.resume,
+                                  temporal_weight=args.temporal_weight if args.temporal else 0.0,
+                                  preferences=args.preferences)
     print("  " + json.dumps(lme_results, indent=2))
 
 

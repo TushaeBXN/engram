@@ -89,6 +89,8 @@ python benchmarks/longmemeval_bench.py ~/datasets/longmemeval/longmemeval_s_clea
   --limit 20                             # quick smoke test
 python benchmarks/longmemeval_bench.py ~/datasets/longmemeval/longmemeval_s_cleaned.json \
   --hybrid --out lme_hybrid.jsonl        # Engram's default search (keyword boost)
+python benchmarks/longmemeval_bench.py ~/datasets/longmemeval/longmemeval_s_cleaned.json \
+  --hybrid --temporal --preferences --out lme_tp.jsonl   # plus temporal + preference boosting
 ```
 
 `--hybrid` applies the keyword boost Engram uses by default (`hybrid_weight`
