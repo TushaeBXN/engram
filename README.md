@@ -50,12 +50,12 @@ Engram's design (wings, rooms, halls, drawers, a temporal knowledge graph) is in
 
 ## Benchmark Targets
 
-These are goals, not results. ES compression is measured today; the LongMemEval runner is ready but its full 500-question score has not been published yet, and the LoCoMo runner is still a stub. See [benchmarks/BENCHMARKS.md](benchmarks/BENCHMARKS.md) to reproduce.
+LongMemEval and ES compression are measured; the LoCoMo runner is still a stub. On LongMemEval (500 questions, all-MiniLM-L6-v2 on ChromaDB, no LLM, no reranker, no API calls) Engram puts the right session in the top 5 for **96.8%** of questions (R@10 98.6%). MemPalace reports 96.6% for its raw mode on the same metric; note that Engram indexes assistant messages too, while MemPalace's raw mode indexes user turns only. Per-type breakdown and how to reproduce: [benchmarks/BENCHMARKS.md](benchmarks/BENCHMARKS.md).
 
 | Benchmark            | Metric              | Target    | Status                  |
 |----------------------|---------------------|-----------|-------------------------|
-| LongMemEval          | Session recall R@5  | ≥ 0.95    | Runner ready, not yet run |
-| LongMemEval          | Session recall R@10 | ≥ 0.97    | Runner ready, not yet run |
+| LongMemEval          | Session recall R@5  | ≥ 0.95    | 0.968 measured          |
+| LongMemEval          | Session recall R@10 | ≥ 0.97    | 0.986 measured          |
 | LoCoMo               | Entity recall       | ≥ 0.72    | Not yet implemented     |
 | LoCoMo               | Event recall        | ≥ 0.69    | Not yet implemented     |
 | ES compression       | Factual paragraphs  | ≥ 1.5×    | 1.6× measured           |

@@ -2,7 +2,7 @@
 
 ## Target Performance
 
-These are goals. ES compression measures about 1.6× on factual text and 1.1× on code. The LongMemEval runner is implemented (below); its full 500-question score has not been published yet. The LoCoMo runner is still a stub that returns `"status": "stub"`.
+These are goals; measured results are in the next section. The LoCoMo runner is still a stub that returns `"status": "stub"`.
 
 | Benchmark         | Metric              | Target     | Notes                        |
 |-------------------|---------------------|------------|------------------------------|
@@ -17,6 +17,42 @@ These are goals. ES compression measures about 1.6× on factual text and 1.1× o
 | Search latency    | p99 (ChromaDB)      | < 200ms    | 100k drawer collection       |
 | Search latency    | p99 (FAISS)         | < 50ms     | 100k drawer collection       |
 | Mine throughput   | Files/sec           | ≥ 50       | average text file size       |
+
+## Measured results
+
+### LongMemEval (longmemeval_s, 500 questions)
+
+Engram 1.1.0, ChromaDB with all-MiniLM-L6-v2, user and assistant messages
+indexed, no hybrid boost, no reranker, no LLM. Run on an Apple-silicon Mac
+mini at about 13 s per question (each question builds its own index).
+
+| Metric        | Engram    |
+|---------------|-----------|
+| R@1           | 0.868     |
+| R@3           | 0.952     |
+| **R@5**       | **0.968** |
+| R@10          | 0.986     |
+| recall_all@5  | 0.854     |
+| NDCG@10       | 0.905     |
+
+By question type (R@5):
+
+| Type                      | n   | R@5   |
+|---------------------------|-----|-------|
+| single-session-assistant  | 56  | 1.000 |
+| multi-session             | 133 | 0.992 |
+| knowledge-update          | 78  | 0.987 |
+| single-session-preference | 30  | 0.967 |
+| temporal-reasoning        | 133 | 0.947 |
+| single-session-user       | 70  | 0.914 |
+
+For reference, MemPalace reports R@5 0.966 for its raw mode. The setups
+differ: Engram indexes assistant messages as well (which is why it answers
+every single-session-assistant question), MemPalace's raw mode indexes user
+turns only, and one question is worth 0.002, so treat the two as level.
+`--roles user` runs Engram the MemPalace way.
+
+ES compression: 1.6× factual, 1.1× code, 1.5× mixed.
 
 ## LongMemEval: how it is measured
 
