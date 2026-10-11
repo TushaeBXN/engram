@@ -45,7 +45,15 @@ python benchmarks/longmemeval_bench.py ~/datasets/longmemeval/longmemeval_s_clea
   --out lme_results.jsonl                # full run, ChromaDB + all-MiniLM-L6-v2
 python benchmarks/longmemeval_bench.py ~/datasets/longmemeval/longmemeval_s_cleaned.json \
   --limit 20                             # quick smoke test
+python benchmarks/longmemeval_bench.py ~/datasets/longmemeval/longmemeval_s_cleaned.json \
+  --hybrid --out lme_hybrid.jsonl        # same run with keyword boosting
 ```
+
+`--hybrid` turns on the same keyword boost as `engram search --hybrid`: each
+hit's score is multiplied by `1 + 0.3 × (share of the question's keywords found
+in the hit)`. Change the weight with `--hybrid-weight`. It is off by default in
+Engram and will only become the default if it improves the full 500-question
+score.
 
 `tests/fixtures/longmemeval_sample.json` is a four-question hand-written sample
 used to test the runner; its scores are not benchmark results.

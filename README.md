@@ -219,6 +219,7 @@ engram search "query"
 engram search "query" --wing myapp
 engram search "query" --room auth-migration
 engram search "query" --no-decay               # disable recency weighting
+engram search "query" --hybrid                 # also boost hits sharing the query's keywords
 engram search "query" --results 20             # max results
 ```
 
@@ -323,6 +324,7 @@ engram split <dir> --dry-run
 | `vector_backend` | `chromadb`           | `chromadb` \| `faiss` \| `sqlitevec`                  |
 | `decay_factor`   | `0.005`              | Recency boost per day: `score * (1 + factor * days)` |
 | `decay_max_days` | `90`                 | Days after which decay levels off                     |
+| `hybrid_weight`  | `0`                  | Keyword boost: `score * (1 + weight * overlap)`; `0.3` turns on hybrid search everywhere (CLI and MCP) |
 | `collection_name`| `engram_drawers`     | ChromaDB collection name                              |
 
 `ENGRAM_VECTOR_BACKEND` overrides `vector_backend` for a single run without editing the file, e.g. `ENGRAM_VECTOR_BACKEND=sqlitevec engram search "auth"`.

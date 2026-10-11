@@ -107,13 +107,15 @@ def _ndcg_any(ranked: list[str], gold: set[str], k: int) -> float:
     return sum(gains) / ideal if ideal else 0.0
 
 
-def rank_sessions(entry: dict, workdir: Path, backend_name: str, roles: str) -> list[str]:
+def rank_sessions(entry: dict, workdir: Path, backend_name: str, roles: str,
+                  hybrid_weight: float = 0.0) -> list[str]:
     """Mine one question's haystack with Engram's pipeline and rank its sessions.
 
     Each haystack session becomes a room; every message goes through
     ConvoMiner (verbatim drawer, chunked index) and the question is answered
     with Searcher, exactly as `engram search` would. Ranked drawers are mapped
-    back to their session, keeping each session's best rank.
+    back to their session, keeping each session's best rank. A non-zero
+    *hybrid_weight* turns on Engram's keyword boost (``engram search --hybrid``).
     """
     from engram.backends import get_backend
     from engram.chateau import Chateau
@@ -140,7 +142,8 @@ def rank_sessions(entry: dict, workdir: Path, backend_name: str, roles: str) -> 
         ]
         miner.store_messages(messages, wing="bench", room=sess_id)
 
-    hits = Searcher(backend, palace, cfg).search(entry["question"], n=50, no_decay=True)
+    hits = Searcher(backend, palace, cfg).search(entry["question"], n=50, no_decay=True,
+                                                 hybrid_weight=hybrid_weight)
     ranked: list[str] = []
     for hit in hits:
         sid = hit["metadata"].get("room")
@@ -150,7 +153,8 @@ def rank_sessions(entry: dict, workdir: Path, backend_name: str, roles: str) -> 
 
 
 def run_longmemeval(data_file: Path, limit: int | None = None, backend: str = "chromadb",
-                    roles: str = "all", out: Path | None = None) -> dict:
+                    roles: str = "all", out: Path | None = None,
+                    hybrid_weight: float = 0.0) -> dict:
     """Session-level retrieval recall on LongMemEval (same metric as MemPalace's "raw" R@k).
 
     For each question a fresh château and index are built from its haystack
@@ -176,7 +180,7 @@ def run_longmemeval(data_file: Path, limit: int | None = None, backend: str = "c
         for i, entry in enumerate(data, 1):
             gold = set(entry["answer_session_ids"])
             with tempfile.TemporaryDirectory() as tmp:
-                ranked = rank_sessions(entry, Path(tmp), backend, roles)
+                ranked = rank_sessions(entry, Path(tmp), backend, roles, hybrid_weight)
             scores = {f"recall_any@{k}": float(bool(gold & set(ranked[:k]))) for k in RECALL_KS}
             scores["recall_all@5"] = float(gold <= set(ranked[:5]))
             scores["ndcg_any@10"] = _ndcg_any(ranked, gold, 10)
@@ -199,6 +203,7 @@ def run_longmemeval(data_file: Path, limit: int | None = None, backend: str = "c
         "questions": len(data),
         "backend": backend,
         "roles": roles,
+        "hybrid_weight": hybrid_weight,
         "seconds": round(time.time() - t0, 1),
         **{name: round(statistics.mean(v), 4) for name, v in totals.items()},
         "by_type": {
@@ -218,6 +223,10 @@ def main() -> None:
     parser.add_argument("--roles", default="all", choices=["all", "user"],
                         help="Index all messages (Engram's default) or user turns only")
     parser.add_argument("--out", type=Path, help="Write per-question results as JSONL")
+    parser.add_argument("--hybrid", action="store_true",
+                        help="Boost hits that share the question's keywords (engram search --hybrid)")
+    parser.add_argument("--hybrid-weight", type=float, default=0.3,
+                        help="Keyword boost weight used with --hybrid (default 0.3)")
     parser.add_argument("--compression-only", action="store_true")
     args = parser.parse_args()
 
@@ -241,7 +250,8 @@ def main() -> None:
 
     print("\n[2/2] LongMemEval retrieval (session recall):")
     lme_results = run_longmemeval(args.data_dir or args.data_file, limit=args.limit,
-                                  backend=args.backend, roles=args.roles, out=args.out)
+                                  backend=args.backend, roles=args.roles, out=args.out,
+                                  hybrid_weight=args.hybrid_weight if args.hybrid else 0.0)
     print("  " + json.dumps(lme_results, indent=2))
 
 
