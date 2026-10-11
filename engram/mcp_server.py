@@ -341,7 +341,7 @@ class EngramMCPServer:
 
         self.cfg = load_config()
         self.palace = Chateau()
-        self.backend = get_backend(self.cfg.get("vector_backend", "chromadb"))
+        self.backend = get_backend(self.cfg.get("vector_backend", "chromadb"), fallback=True)
         self.searcher = Searcher(self.backend, self.palace, self.cfg)
         self.stack = LayerStack(self.palace, self.searcher, self.cfg)
         self.kg = KnowledgeGraph()

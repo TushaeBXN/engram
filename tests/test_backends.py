@@ -52,3 +52,41 @@ def test_env_var_overrides_config_file(isolated_config, monkeypatch):
 def test_config_file_used_without_env_var(isolated_config):
     config_mod.save_config({"vector_backend": "faiss"})
     assert config_mod.load_config()["vector_backend"] == "faiss"
+
+
+# ---------------------------------------------------------------------------
+# Fallback when ChromaDB is not installed (e.g. Python 3.15, no onnxruntime)
+# ---------------------------------------------------------------------------
+
+def test_missing_chromadb_falls_back_to_sqlitevec(tmp_path, monkeypatch, capsys):
+    import engram.backends as backends
+    from engram.backends.sqlitevec_backend import SqliteVecBackend
+
+    monkeypatch.setattr(backends, "_chromadb_installed", lambda: False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    backend = backends.get_backend("chromadb", fallback=True)
+    assert isinstance(backend, SqliteVecBackend)
+    assert "ChromaDB is not installed" in capsys.readouterr().err
+
+
+def test_missing_chromadb_without_fallback_still_raises(monkeypatch):
+    import engram.backends as backends
+
+    monkeypatch.setattr(backends, "_chromadb_installed", lambda: False)
+    monkeypatch.setitem(sys.modules, "chromadb", None)  # import chromadb -> ImportError
+    with pytest.raises(backends.BackendUnavailableError):
+        backends.get_backend("chromadb")
+
+
+def test_chromadb_dependency_skipped_where_onnxruntime_has_no_build():
+    import re
+    from pathlib import Path
+
+    from packaging.requirements import Requirement
+
+    pyproject = (Path(__file__).resolve().parent.parent / "pyproject.toml").read_text()
+    deps = re.search(r"^dependencies = \[(.*?)^\]", pyproject, re.S | re.M).group(1)
+    chroma = Requirement(re.search(r"'(chromadb[^']*)'", deps).group(1))
+    assert str(chroma.specifier) == ">=1.0.0"
+    assert chroma.marker.evaluate({"python_version": "3.14"})
+    assert not chroma.marker.evaluate({"python_version": "3.15"})

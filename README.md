@@ -463,7 +463,7 @@ A local notes app with a force-directed graph of your notes and their `[[wikilin
 ## Requirements
 
 - Python 3.9+
-- chromadb ≥ 0.4.0
+- chromadb ≥ 1.0 on Python 3.9–3.14, installed automatically. On Python 3.15+ (no onnxruntime build yet) Engram installs without it and uses the built-in sqlitevec backend; use Python 3.11–3.14 for semantic search.
 - typer ≥ 0.9.0
 - rich ≥ 13.0.0
 - watchdog ≥ 3.0.0

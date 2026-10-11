@@ -154,7 +154,7 @@ class Onboarder:
             from engram.chateau import Chateau
             from engram.miner import Miner
             palace = Chateau()
-            backend = get_backend(self.cfg.get("vector_backend", "chromadb"))
+            backend = get_backend(self.cfg.get("vector_backend", "chromadb"), fallback=True)
             miner = Miner(palace, backend, self.cfg)
             wing = self.cfg.get("default_wing", "default")
             with console.status(f"Mining [cyan]{project_dir}[/cyan]..."):
