@@ -31,25 +31,30 @@ per question (each question builds its own index). Three configurations:
 - **Default**: plus temporal boosting and preference summaries
   (`--hybrid --temporal --preferences`), which is what Engram 1.3.0 does.
 
-| Metric        | Semantic | Hybrid (keywords) | **Default** |
-|---------------|----------|-------------------|-------------|
-| R@1           | 0.868    | 0.874             | 0.888       |
-| R@3           | 0.952    | 0.954             | 0.970       |
-| **R@5**       | 0.968    | 0.974             | **0.982**   |
-| R@10          | 0.986    | 0.988             | 0.992       |
-| recall_all@5  | 0.854    | 0.874             | 0.882       |
-| NDCG@10       | 0.905    | 0.914             | 0.923       |
+| Metric        | Semantic | Hybrid (keywords) | **Default** | Default + local reranker |
+|---------------|----------|-------------------|-------------|--------------------------|
+| R@1           | 0.868    | 0.874             | 0.888       | **0.924**                |
+| R@3           | 0.952    | 0.954             | 0.970       | 0.974                    |
+| **R@5**       | 0.968    | 0.974             | 0.982       | **0.988**                |
+| R@10          | 0.986    | 0.988             | 0.992       | 0.990                    |
+| recall_all@5  | 0.854    | 0.874             | 0.882       | 0.902                    |
+| NDCG@10       | 0.905    | 0.914             | 0.923       | 0.940                    |
 
 By question type (R@5):
 
-| Type                      | n   | Semantic | Hybrid (keywords) | Default |
-|---------------------------|-----|----------|-------------------|---------|
-| single-session-assistant  | 56  | 1.000    | 1.000             | 1.000   |
-| knowledge-update          | 78  | 0.987    | 1.000             | 1.000   |
-| multi-session             | 133 | 0.992    | 0.992             | 0.992   |
-| single-session-user       | 70  | 0.914    | 0.929             | 0.971   |
-| single-session-preference | 30  | 0.967    | 0.967             | 0.967   |
-| temporal-reasoning        | 133 | 0.947    | 0.955             | 0.962   |
+| Type                      | n   | Semantic | Hybrid (keywords) | Default | + reranker |
+|---------------------------|-----|----------|-------------------|---------|------------|
+| single-session-assistant  | 56  | 1.000    | 1.000             | 1.000   | 1.000      |
+| knowledge-update          | 78  | 0.987    | 1.000             | 1.000   | 1.000      |
+| multi-session             | 133 | 0.992    | 0.992             | 0.992   | 0.992      |
+| single-session-user       | 70  | 0.914    | 0.929             | 0.971   | 0.986      |
+| single-session-preference | 30  | 0.967    | 0.967             | 0.967   | 1.000      |
+| temporal-reasoning        | 133 | 0.947    | 0.955             | 0.962   | 0.970      |
+
+The reranker column adds `--rerank`: Engram's optional local cross-encoder
+(ms-marco-MiniLM-L-6-v2, ONNX, no LLM or API) reordering the top 20 results,
+a setting chosen before the run. It is off by default; `engram setup-reranker`
+turns it on. R@10 drops by one question because only the top 20 are reordered.
 
 Each step improved some question types and made none worse, which is why all
 three signals are on by default. Temporal boosting and preference summaries

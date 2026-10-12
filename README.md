@@ -4,7 +4,7 @@
 
 > **Small, private, verbatim memory for your AI — set up in a minute, readable in an afternoon.**
 
-**98.2% R@5 on LongMemEval with no AI model and no API calls: ahead of MemPalace's raw mode (96.6%) and within one question of its best no-model score (98.4%). Free, local, one `pip install`.** ([results](#engram-and-mempalace))
+**98.8% R@5 on LongMemEval with no LLM and no API calls, ahead of MemPalace's best no-LLM score (98.4%).** That is with Engram's optional local reranker (`engram setup-reranker`); out of the box it scores 98.2%. Free, local, one `pip install`. ([results](#engram-and-mempalace))
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/)
@@ -39,9 +39,11 @@ Engram's design (wings, rooms, halls, drawers, a temporal knowledge graph) is in
 |---|---|---|
 | Semantic search only, no AI model | **96.8%** | 96.6% |
 | Hybrid: keywords only, no AI model | 97.4% | — |
-| Hybrid: keywords + time + preferences, no AI model | **98.2%** (Engram's default) | **98.4%** (hybrid v4, held-out 450 questions) |
-| Hybrid + AI reranking | not offered | ≥ 99% |
-| R@10, default setup | **99.2%** | — |
+| Hybrid: keywords + time + preferences, no AI model | 98.2% (Engram's default) | 98.4% (hybrid v4, held-out 450 questions) |
+| Hybrid + **local** reranker, no LLM, no API | **98.8%** (opt-in: `engram setup-reranker`) | — |
+| Hybrid + LLM reranking (API key) | not offered | ≥ 99% |
+| R@1: default / with local reranker | 88.8% / **92.4%** | — |
+| R@10: default / with local reranker | **99.2%** / 99.0% | — |
 
 Engram's numbers come from one full run each on a Mac mini with the default local embedding model (all-MiniLM-L6-v2); MemPalace's are from [its README](https://github.com/MemPalace/mempalace#benchmarks). The setups differ, so read this as "level on raw retrieval":
 
@@ -79,7 +81,7 @@ MemPalace also publishes ConvoMem and MemBench results and offers LLM reranking,
 
 ## Benchmark Targets
 
-LongMemEval, LoCoMo and ES compression are measured. On LongMemEval (500 questions, all-MiniLM-L6-v2 on ChromaDB, no LLM, no reranker, no API calls) Engram's default search puts the right session in the top 5 for **98.2%** of questions and in the top 10 for 99.2% (semantic search alone: 96.8% and 98.6%). On LoCoMo it reaches 87.4% session R@10 (semantic alone: 84.4%). See [Engram and MemPalace](#engram-and-mempalace) for the comparison, and [benchmarks/BENCHMARKS.md](benchmarks/BENCHMARKS.md) for the per-type breakdown and how to reproduce.
+LongMemEval, LoCoMo and ES compression are measured. On LongMemEval (500 questions, all-MiniLM-L6-v2 on ChromaDB, no LLM, no reranker, no API calls) Engram's default search puts the right session in the top 5 for **98.2%** of questions and in the top 10 for 99.2% (semantic search alone: 96.8% and 98.6%); with the optional local reranker, R@5 is **98.8%**. On LoCoMo it reaches 87.4% session R@10 (semantic alone: 84.4%; with the local reranker: 88.7%). See [Engram and MemPalace](#engram-and-mempalace) for the comparison, and [benchmarks/BENCHMARKS.md](benchmarks/BENCHMARKS.md) for the per-type breakdown and how to reproduce.
 
 | Benchmark            | Metric              | Target    | Status                  |
 |----------------------|---------------------|-----------|-------------------------|
@@ -250,6 +252,7 @@ engram search "query" --room auth-migration
 engram search "query" --no-decay               # disable recency weighting
 engram search "query" --no-hybrid              # semantic only (keyword boost is on by default)
 engram search "query" --rerank                 # reorder the top results with the local reranker (optional)
+engram setup-reranker                          # download the reranker model once and turn reranking on
 engram search "query" --results 20             # max results
 ```
 
@@ -360,7 +363,7 @@ engram split <dir> --dry-run
 | `hybrid_weight`  | `0.3`                | Keyword boost for hybrid search: `score * (1 + weight * overlap)`; `0` for semantic only (CLI and MCP) |
 | `temporal_weight`| `0.4`                | Boost for memories dated near a time the query names ("two weeks ago"); `0` to turn off |
 | `preference_summaries` | `true`         | Index a "User has mentioned: …" summary with user messages that state preferences or concerns (applies to newly mined conversations) |
-| `reranker`       | `false`              | Reorder the top results with a local cross-encoder (ms-marco-MiniLM, ONNX, no API key). The first use downloads a ~90 MB model to `~/.engram/models/`; while `false`, Engram makes no network calls for it |
+| `reranker`       | `false`              | Reorder the top results with a local cross-encoder (ms-marco-MiniLM, ONNX, no API key). `engram setup-reranker` downloads the ~90 MB model once and turns this on; `engram setup-reranker --disable` turns it off. While `false`, Engram makes no network calls for it |
 | `rerank_top`     | `20`                 | How many top results the reranker reorders |
 | `collection_name`| `engram_drawers`     | ChromaDB collection name                              |
 

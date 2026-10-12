@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## 1.4.0
+
+**98.8% R@5 on LongMemEval and 88.7% R@10 on LoCoMo with the optional local
+reranker, no LLM and no API** (out of the box: 98.2% and 87.4%).
+`engram setup-reranker` downloads the model once and turns it on;
+`engram setup-reranker --disable` turns it off. It stays off by default, so
+existing installs and apps behave exactly as before.
 
 **Optional local reranker** (`engram.reranker`, off by default). A small
 cross-encoder (ms-marco-MiniLM-L-6-v2, ONNX) re-reads the top results next to

@@ -834,6 +834,48 @@ def cmd_install_hooks(
     print(json.dumps(snippet, indent=2))
 
 
+@app.command("setup-reranker")
+def cmd_setup_reranker(
+    disable: bool = typer.Option(False, "--disable", help="Turn the reranker off again."),
+):
+    """Download the local reranker model (~90 MB, once) and turn reranking on.
+
+    The reranker reorders the top search results with a small cross-encoder that
+    runs on this machine (no API key). It raised LongMemEval R@5 from 98.2% to
+    98.8% and LoCoMo R@10 from 87.4% to 88.7%. Engram never downloads the model
+    by itself; this command is the only thing that does.
+    """
+    import json
+
+    from engram import config as cfg_mod
+    from engram import reranker as rr
+
+    cfg_mod.ensure_engram_dir()
+    path = cfg_mod.CONFIG_PATH
+    saved = {}
+    if path.exists():
+        try:
+            saved = json.loads(path.read_text())
+        except (json.JSONDecodeError, OSError):
+            saved = {}
+    if disable:
+        saved["reranker"] = False
+        path.write_text(json.dumps(saved, indent=2))
+        console.print("[green]✓[/green] Reranker turned off.")
+        return
+    try:
+        model_dir = rr.ensure_model(saved.get("reranker_model", rr.DEFAULT_MODEL))
+        rr.CrossEncoder(model_dir).score("test", ["test"])  # fail here, not on the first search
+    except rr.RerankerUnavailable as exc:
+        console.print(f"[red]Reranker setup failed:[/red] {exc}")
+        raise typer.Exit(1)
+    saved["reranker"] = True
+    path.write_text(json.dumps(saved, indent=2))
+    console.print(f"[green]✓[/green] Reranker model ready in {model_dir}")
+    console.print("Reranking is on for `engram search` and the MCP server. "
+                  "Turn it off with [bold]engram setup-reranker --disable[/bold].")
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------

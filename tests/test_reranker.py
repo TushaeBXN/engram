@@ -170,3 +170,29 @@ def test_benchmark_runners_accept_rerank(monkeypatch):
     loc = load("locomo", "locomo_bench.py").run_locomo(
         ROOT / "tests" / "fixtures" / "locomo_sample.json", backend="sqlitevec", rerank=True)
     assert loc["rerank"] is True and loc["questions"] == 5
+
+
+def test_setup_reranker_command(engram_home, monkeypatch):
+    import json
+
+    from engram import config as cfg_mod
+    monkeypatch.setattr(rr, "ensure_model", lambda model=rr.DEFAULT_MODEL, **kw: TINY)
+    cfg_mod.ensure_engram_dir()
+    cfg_mod.CONFIG_PATH.write_text(json.dumps({"hybrid_weight": 0.5}))
+    runner = CliRunner()
+    result = runner.invoke(app, ["setup-reranker"])
+    assert result.exit_code == 0, result.output
+    assert json.loads(cfg_mod.CONFIG_PATH.read_text()) == {"hybrid_weight": 0.5, "reranker": True}
+    assert cfg_mod.load_config()["reranker"] is True
+    result = runner.invoke(app, ["setup-reranker", "--disable"])
+    assert result.exit_code == 0
+    assert json.loads(cfg_mod.CONFIG_PATH.read_text())["reranker"] is False
+
+
+def test_setup_reranker_reports_failure(engram_home, monkeypatch):
+    def fail(model=rr.DEFAULT_MODEL, **kw):
+        raise rr.RerankerUnavailable("offline")
+
+    monkeypatch.setattr(rr, "ensure_model", fail)
+    result = CliRunner().invoke(app, ["setup-reranker"])
+    assert result.exit_code == 1 and "offline" in result.output
