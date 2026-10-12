@@ -49,7 +49,17 @@ Engram's numbers come from one full run each on a Mac mini with the default loca
 - Both hybrids boost keywords, times the question names and preferences you mentioned. Engram's versions are general rules written without looking at the benchmark's missed questions, and are scored on all 500 questions; MemPalace's v4 was tuned on 50 questions and scored on the other 450.
 - One question is worth 0.2 points: 98.2% vs 98.4% is one question.
 
-MemPalace also publishes LoCoMo, ConvoMem and MemBench results and offers LLM reranking, a shared memory hub across machines and Docker images; Engram has none of those yet. Every Engram number above is reproducible with the commands in [benchmarks/BENCHMARKS.md](benchmarks/BENCHMARKS.md).
+On **LoCoMo** (10 long conversations, 1,986 questions, session-level R@10: share of the sessions holding the answer that are in the top 10 results), measured the same way MemPalace measures it:
+
+| LoCoMo R@10 | Engram | MemPalace |
+|---|---|---|
+| Semantic search only, no AI model | **84.4%** | 60.3% |
+| Hybrid, no AI model | 87.4% (Engram's default) | **88.9%** (hybrid v5) |
+| Hybrid R@5 | 78.3% | **83.7%** |
+
+Engram's raw retrieval is 24 points ahead here because it indexes every message (split into chunks) rather than one embedding per session, which the embedding model truncates. MemPalace's LoCoMo hybrid is ahead by 1.5 points at R@10 and 5.4 at R@5; it adds a person-name boost, a quoted-phrase boost and a heavier keyword weight on top of what Engram does. Engram's LoCoMo run uses its LongMemEval defaults unchanged.
+
+MemPalace also publishes ConvoMem and MemBench results and offers LLM reranking, a shared memory hub across machines and Docker images; Engram has none of those yet. Every Engram number above is reproducible with the commands in [benchmarks/BENCHMARKS.md](benchmarks/BENCHMARKS.md).
 
 ---
 
@@ -68,14 +78,14 @@ MemPalace also publishes LoCoMo, ConvoMem and MemBench results and offers LLM re
 
 ## Benchmark Targets
 
-LongMemEval and ES compression are measured; the LoCoMo runner is still a stub. On LongMemEval (500 questions, all-MiniLM-L6-v2 on ChromaDB, no LLM, no reranker, no API calls) Engram's default search puts the right session in the top 5 for **98.2%** of questions and in the top 10 for 99.2% (semantic search alone: 96.8% and 98.6%). See [Engram and MemPalace](#engram-and-mempalace) for the comparison, and [benchmarks/BENCHMARKS.md](benchmarks/BENCHMARKS.md) for the per-type breakdown and how to reproduce.
+LongMemEval, LoCoMo and ES compression are measured. On LongMemEval (500 questions, all-MiniLM-L6-v2 on ChromaDB, no LLM, no reranker, no API calls) Engram's default search puts the right session in the top 5 for **98.2%** of questions and in the top 10 for 99.2% (semantic search alone: 96.8% and 98.6%). On LoCoMo it reaches 87.4% session R@10 (semantic alone: 84.4%). See [Engram and MemPalace](#engram-and-mempalace) for the comparison, and [benchmarks/BENCHMARKS.md](benchmarks/BENCHMARKS.md) for the per-type breakdown and how to reproduce.
 
 | Benchmark            | Metric              | Target    | Status                  |
 |----------------------|---------------------|-----------|-------------------------|
 | LongMemEval          | Session recall R@5  | ≥ 0.95    | 0.982 measured          |
 | LongMemEval          | Session recall R@10 | ≥ 0.97    | 0.992 measured          |
-| LoCoMo               | Entity recall       | ≥ 0.72    | Not yet implemented     |
-| LoCoMo               | Event recall        | ≥ 0.69    | Not yet implemented     |
+| LoCoMo               | Session recall R@10 | ≥ 0.85    | 0.874 measured          |
+| LoCoMo               | Session recall R@5  | ≥ 0.75    | 0.783 measured          |
 | ES compression       | Factual paragraphs  | ≥ 1.5×    | 1.6× measured           |
 | ES compression       | Code-heavy content  | ≥ 1.1×    | 1.1× measured           |
 | ES compression       | Mixed               | ≥ 1.4×    | 1.5× measured           |

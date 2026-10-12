@@ -1,0 +1,26 @@
+[
+  {
+    "sample_id": "conv-test",
+    "conversation": {
+      "speaker_a": "Caroline",
+      "speaker_b": "Melanie",
+      "session_1_date_time": "1:56 pm on 8 May, 2023",
+      "session_1": [
+        {"speaker": "Caroline", "dia_id": "D1:1", "text": "I went to the LGBTQ support group yesterday and it was really powerful."},
+        {"speaker": "Melanie", "dia_id": "D1:2", "text": "That sounds wonderful. I spent the weekend painting a sunrise with my kids."}
+      ],
+      "session_2_date_time": "10:37 am on 27 June, 2023",
+      "session_2": [
+        {"speaker": "Melanie", "dia_id": "D2:1", "text": "We finally went camping at the lake and roasted marshmallows."},
+        {"speaker": "Caroline", "dia_id": "D2:2", "text": "I started researching adoption agencies because I want to build a family."}
+      ]
+    },
+    "qa": [
+      {"question": "When did Caroline go to the LGBTQ support group?", "answer": "7 May 2023", "evidence": ["D1:1"], "category": 2},
+      {"question": "What did Melanie paint?", "answer": "A sunrise", "evidence": ["D1:2"], "category": 4},
+      {"question": "Where did Melanie go camping?", "answer": "The lake", "evidence": ["D2:1"], "category": 1},
+      {"question": "What is Caroline researching?", "answer": "Adoption agencies", "evidence": ["D2:2", "D:9"], "category": 4},
+      {"question": "What did Caroline say about her cat?", "adversarial_answer": "Nothing", "evidence": [], "category": 5}
+    ]
+  }
+]
