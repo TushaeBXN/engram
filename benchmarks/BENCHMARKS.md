@@ -22,38 +22,43 @@ These are goals; measured results are in the next section. The LoCoMo runner is 
 
 ### LongMemEval (longmemeval_s, 500 questions)
 
-Engram 1.2.0, ChromaDB with all-MiniLM-L6-v2, user and assistant messages
+Engram 1.3.0, ChromaDB with all-MiniLM-L6-v2, user and assistant messages
 indexed, no reranker, no LLM. Run on an Apple-silicon Mac mini at about 13 s
-per question (each question builds its own index). "Hybrid" is Engram's
-default search (keyword boost, `hybrid_weight` 0.3, `--hybrid` in the runner);
-"semantic" is the embedding score alone.
+per question (each question builds its own index). Three configurations:
 
-| Metric        | Semantic | Hybrid (default) |
-|---------------|----------|------------------|
-| R@1           | 0.868    | 0.874            |
-| R@3           | 0.952    | 0.954            |
-| **R@5**       | 0.968    | **0.974**        |
-| R@10          | 0.986    | 0.988            |
-| recall_all@5  | 0.854    | 0.874            |
-| NDCG@10       | 0.905    | 0.914            |
+- **Semantic**: the embedding score alone (runner default).
+- **Hybrid (keywords)**: plus the keyword boost (`--hybrid`).
+- **Default**: plus temporal boosting and preference summaries
+  (`--hybrid --temporal --preferences`), which is what Engram 1.3.0 does.
+
+| Metric        | Semantic | Hybrid (keywords) | **Default** |
+|---------------|----------|-------------------|-------------|
+| R@1           | 0.868    | 0.874             | 0.888       |
+| R@3           | 0.952    | 0.954             | 0.970       |
+| **R@5**       | 0.968    | 0.974             | **0.982**   |
+| R@10          | 0.986    | 0.988             | 0.992       |
+| recall_all@5  | 0.854    | 0.874             | 0.882       |
+| NDCG@10       | 0.905    | 0.914             | 0.923       |
 
 By question type (R@5):
 
-| Type                      | n   | Semantic | Hybrid |
-|---------------------------|-----|----------|--------|
-| single-session-assistant  | 56  | 1.000    | 1.000  |
-| knowledge-update          | 78  | 0.987    | 1.000  |
-| multi-session             | 133 | 0.992    | 0.992  |
-| single-session-preference | 30  | 0.967    | 0.967  |
-| temporal-reasoning        | 133 | 0.947    | 0.955  |
-| single-session-user       | 70  | 0.914    | 0.929  |
+| Type                      | n   | Semantic | Hybrid (keywords) | Default |
+|---------------------------|-----|----------|-------------------|---------|
+| single-session-assistant  | 56  | 1.000    | 1.000             | 1.000   |
+| knowledge-update          | 78  | 0.987    | 1.000             | 1.000   |
+| multi-session             | 133 | 0.992    | 0.992             | 0.992   |
+| single-session-user       | 70  | 0.914    | 0.929             | 0.971   |
+| single-session-preference | 30  | 0.967    | 0.967             | 0.967   |
+| temporal-reasoning        | 133 | 0.947    | 0.955             | 0.962   |
 
-The keyword boost improved three question types and made none worse, which
-is why it is on by default.
+Each step improved some question types and made none worse, which is why all
+three signals are on by default. Temporal boosting and preference summaries
+were measured together in one run, so their individual shares are not
+separated; the temporal weight (0.4) was set before the run, not tuned on it.
 
 For reference, MemPalace reports R@5 0.966 for its raw mode and 0.984 for its
-hybrid v4 (held-out 450 questions; keyword, temporal and preference
-boosting). The setups differ: Engram indexes assistant messages as well
+hybrid v4 (keyword, temporal and preference boosting, tuned on 50 questions
+and scored on the other 450). The setups differ: Engram indexes assistant messages as well
 (which is why it answers every single-session-assistant question), MemPalace's
 raw mode indexes user turns only, and one question is worth 0.002.
 `--roles user` runs Engram the MemPalace way.
@@ -88,15 +93,18 @@ python benchmarks/longmemeval_bench.py ~/datasets/longmemeval/longmemeval_s_clea
 python benchmarks/longmemeval_bench.py ~/datasets/longmemeval/longmemeval_s_cleaned.json \
   --limit 20                             # quick smoke test
 python benchmarks/longmemeval_bench.py ~/datasets/longmemeval/longmemeval_s_cleaned.json \
-  --hybrid --out lme_hybrid.jsonl        # Engram's default search (keyword boost)
+  --hybrid --out lme_hybrid.jsonl        # keyword boost only
 python benchmarks/longmemeval_bench.py ~/datasets/longmemeval/longmemeval_s_cleaned.json \
-  --hybrid --temporal --preferences --out lme_tp.jsonl   # plus temporal + preference boosting
+  --hybrid --temporal --preferences --out lme_default.jsonl   # Engram's default search (98.2%)
 ```
 
 `--hybrid` applies the keyword boost Engram uses by default (`hybrid_weight`
 0.3): each hit's score is multiplied by `1 + 0.3 × (share of the question's
-keywords found in the hit)`. Change the weight with `--hybrid-weight`. Without
-`--hybrid` the runner measures semantic search alone.
+keywords found in the hit)`. Change the weight with `--hybrid-weight`.
+`--temporal` adds the time boost (`1 + 0.4 × closeness` to a time the question
+names, relative to the question's date) and `--preferences` indexes preference
+summaries with user messages. All three together reproduce Engram's default;
+with none, the runner measures semantic search alone.
 
 `tests/fixtures/longmemeval_sample.json` is a four-question hand-written sample
 used to test the runner; its scores are not benchmark results.

@@ -4,7 +4,7 @@
 
 > **Small, private, verbatim memory for your AI — set up in a minute, readable in an afternoon.**
 
-**97.4% R@5 on LongMemEval, ahead of MemPalace's raw mode (96.6%), with no AI model and no API calls. Free, local, one `pip install`.** ([results](#engram-and-mempalace))
+**98.2% R@5 on LongMemEval with no AI model and no API calls: ahead of MemPalace's raw mode (96.6%) and within one question of its best no-model score (98.4%). Free, local, one `pip install`.** ([results](#engram-and-mempalace))
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/)
@@ -38,15 +38,16 @@ Engram's design (wings, rooms, halls, drawers, a temporal knowledge graph) is in
 | LongMemEval R@5 | Engram | MemPalace |
 |---|---|---|
 | Semantic search only, no AI model | **96.8%** | 96.6% |
-| Hybrid search, no AI model | **97.4%** (Engram's default) | **98.4%** (held-out 450 questions) |
+| Hybrid: keywords only, no AI model | 97.4% | — |
+| Hybrid: keywords + time + preferences, no AI model | **98.2%** (Engram's default) | **98.4%** (hybrid v4, held-out 450 questions) |
 | Hybrid + AI reranking | not offered | ≥ 99% |
-| R@10 (semantic / hybrid) | 98.6% / 98.8% | — |
+| R@10, default setup | **99.2%** | — |
 
 Engram's numbers come from one full run each on a Mac mini with the default local embedding model (all-MiniLM-L6-v2); MemPalace's are from [its README](https://github.com/MemPalace/mempalace#benchmarks). The setups differ, so read this as "level on raw retrieval":
 
 - Engram indexes assistant messages as well as yours; MemPalace's raw mode indexes your messages only. That is why Engram answers every "what did you tell me about…" question.
-- Engram's hybrid search is a keyword boost only. MemPalace's hybrid v4 also boosts by time and by your stated preferences, and leads by one point there.
-- One question is worth 0.2 points.
+- Both hybrids boost keywords, times the question names and preferences you mentioned. Engram's versions are general rules written without looking at the benchmark's missed questions, and are scored on all 500 questions; MemPalace's v4 was tuned on 50 questions and scored on the other 450.
+- One question is worth 0.2 points: 98.2% vs 98.4% is one question.
 
 MemPalace also publishes LoCoMo, ConvoMem and MemBench results and offers LLM reranking, a shared memory hub across machines and Docker images; Engram has none of those yet. Every Engram number above is reproducible with the commands in [benchmarks/BENCHMARKS.md](benchmarks/BENCHMARKS.md).
 
@@ -67,12 +68,12 @@ MemPalace also publishes LoCoMo, ConvoMem and MemBench results and offers LLM re
 
 ## Benchmark Targets
 
-LongMemEval and ES compression are measured; the LoCoMo runner is still a stub. On LongMemEval (500 questions, all-MiniLM-L6-v2 on ChromaDB, no LLM, no reranker, no API calls) Engram's default search puts the right session in the top 5 for **97.4%** of questions and in the top 10 for 98.8% (semantic search alone: 96.8% and 98.6%). See [Engram and MemPalace](#engram-and-mempalace) for the comparison, and [benchmarks/BENCHMARKS.md](benchmarks/BENCHMARKS.md) for the per-type breakdown and how to reproduce.
+LongMemEval and ES compression are measured; the LoCoMo runner is still a stub. On LongMemEval (500 questions, all-MiniLM-L6-v2 on ChromaDB, no LLM, no reranker, no API calls) Engram's default search puts the right session in the top 5 for **98.2%** of questions and in the top 10 for 99.2% (semantic search alone: 96.8% and 98.6%). See [Engram and MemPalace](#engram-and-mempalace) for the comparison, and [benchmarks/BENCHMARKS.md](benchmarks/BENCHMARKS.md) for the per-type breakdown and how to reproduce.
 
 | Benchmark            | Metric              | Target    | Status                  |
 |----------------------|---------------------|-----------|-------------------------|
-| LongMemEval          | Session recall R@5  | ≥ 0.95    | 0.974 measured          |
-| LongMemEval          | Session recall R@10 | ≥ 0.97    | 0.988 measured          |
+| LongMemEval          | Session recall R@5  | ≥ 0.95    | 0.982 measured          |
+| LongMemEval          | Session recall R@10 | ≥ 0.97    | 0.992 measured          |
 | LoCoMo               | Entity recall       | ≥ 0.72    | Not yet implemented     |
 | LoCoMo               | Event recall        | ≥ 0.69    | Not yet implemented     |
 | ES compression       | Factual paragraphs  | ≥ 1.5×    | 1.6× measured           |
@@ -331,6 +332,8 @@ engram split <dir> --dry-run
   "decay_factor": 0.005,
   "decay_max_days": 90,
   "hybrid_weight": 0.3,
+  "temporal_weight": 0.4,
+  "preference_summaries": true,
   "collection_name": "engram_drawers",
   "people_map": {}
 }
@@ -343,8 +346,8 @@ engram split <dir> --dry-run
 | `decay_factor`   | `0.005`              | Recency boost per day: `score * (1 + factor * days)` |
 | `decay_max_days` | `90`                 | Days after which decay levels off                     |
 | `hybrid_weight`  | `0.3`                | Keyword boost for hybrid search: `score * (1 + weight * overlap)`; `0` for semantic only (CLI and MCP) |
-| `temporal_weight`| `0`                  | Boost for memories dated near a time the query names ("two weeks ago"); try `0.4` |
-| `preference_summaries` | `false`        | Index a "User has mentioned: …" summary with user messages that state preferences or concerns (applies to newly mined conversations) |
+| `temporal_weight`| `0.4`                | Boost for memories dated near a time the query names ("two weeks ago"); `0` to turn off |
+| `preference_summaries` | `true`         | Index a "User has mentioned: …" summary with user messages that state preferences or concerns (applies to newly mined conversations) |
 | `collection_name`| `engram_drawers`     | ChromaDB collection name                              |
 
 `ENGRAM_VECTOR_BACKEND` overrides `vector_backend` for a single run without editing the file, e.g. `ENGRAM_VECTOR_BACKEND=sqlitevec engram search "auth"`.
@@ -514,7 +517,7 @@ Engram is published to PyPI as **`engram-chateau`** (the command and `import eng
 
 The trusted publisher is configured on pypi.org for project `engram-chateau`: owner `TushaeBXN`, repository `engram`, workflow `publish.yml`, environment `pypi`.
 
-To release: bump `version` in `pyproject.toml` and `__version__` in `engram/__init__.py`, merge, then publish a GitHub release tagged `v<version>` (for example `v1.1.0`). The workflow checks the tag matches both, runs the tests, builds, and uploads.
+To release: bump `version` in `pyproject.toml` and `__version__` in `engram/__init__.py`, merge, then publish a GitHub release tagged `v<version>` with the dots kept (for example `v1.3.0`, not `v1.30`). The workflow checks the tag matches both, runs the tests, builds, and uploads.
 
 ---
 
