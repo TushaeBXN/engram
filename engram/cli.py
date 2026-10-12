@@ -201,7 +201,11 @@ def cmd_search(
         loc = f"{meta.get('wing','?')}/{meta.get('room','?')}/{meta.get('hall','?')}"
         if reranked:
             rs = r.get("rerank_score")
-            score_str = f"{1 / (1 + math.exp(-rs)):.3f}" if rs is not None else "—"
+            if rs is None:
+                score_str = "—"
+            else:
+                rel = 1 / (1 + math.exp(-rs))
+                score_str = f"{rel:.3f}" if rel >= 0.001 else "<0.001"
         else:
             score_str = f"{r['final_score']:.3f}"
         pin = " 📌" if r.get("pinned") else ""
