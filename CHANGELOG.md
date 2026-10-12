@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+**Optional local reranker** (`engram.reranker`, off by default). A small
+cross-encoder (ms-marco-MiniLM-L-6-v2, ONNX) re-reads the top results next to
+the query and reorders them. It runs on onnxruntime and tokenizers, which
+ChromaDB already installs: no PyTorch, no API key, nothing leaves the machine.
+Turn it on with `"reranker": true` or `engram search --rerank`; the model
+(~90 MB) is downloaded once to `~/.engram/models/` on first use, and never
+while the reranker is off. If it cannot be loaded, search continues without
+it. Both benchmark runners gained `--rerank`. Not on by default until it is
+measured on the full benchmarks.
+
+**API contract tests** (`tests/test_public_api.py`) pin the Python calls apps
+such as the Amy companion build on.
+
 **LoCoMo benchmark.** `benchmarks/locomo_bench.py` replaces the old stub:
 session recall@k over all 1,986 LoCoMo questions, computed the same way as
 MemPalace's runner. Engram scores R@10 0.874 with its defaults (0.844 with

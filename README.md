@@ -248,6 +248,7 @@ engram search "query" --wing myapp
 engram search "query" --room auth-migration
 engram search "query" --no-decay               # disable recency weighting
 engram search "query" --no-hybrid              # semantic only (keyword boost is on by default)
+engram search "query" --rerank                 # reorder the top results with the local reranker (optional)
 engram search "query" --results 20             # max results
 ```
 
@@ -358,6 +359,8 @@ engram split <dir> --dry-run
 | `hybrid_weight`  | `0.3`                | Keyword boost for hybrid search: `score * (1 + weight * overlap)`; `0` for semantic only (CLI and MCP) |
 | `temporal_weight`| `0.4`                | Boost for memories dated near a time the query names ("two weeks ago"); `0` to turn off |
 | `preference_summaries` | `true`         | Index a "User has mentioned: …" summary with user messages that state preferences or concerns (applies to newly mined conversations) |
+| `reranker`       | `false`              | Reorder the top results with a local cross-encoder (ms-marco-MiniLM, ONNX, no API key). The first use downloads a ~90 MB model to `~/.engram/models/`; while `false`, Engram makes no network calls for it |
+| `rerank_top`     | `20`                 | How many top results the reranker reorders |
 | `collection_name`| `engram_drawers`     | ChromaDB collection name                              |
 
 `ENGRAM_VECTOR_BACKEND` overrides `vector_backend` for a single run without editing the file, e.g. `ENGRAM_VECTOR_BACKEND=sqlitevec engram search "auth"`.

@@ -21,6 +21,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # raised LongMemEval R@5 from 0.974 to 0.982.
     "temporal_weight": 0.4,
     "preference_summaries": True,
+    # Optional local cross-encoder that reorders the top results
+    # (engram.reranker). Off by default; turning it on downloads a ~90 MB
+    # model once to ~/.engram/models/.
+    "reranker": False,
+    "rerank_top": 20,
     "collection_name": "engram_drawers",
     "people_map": {},
 }
