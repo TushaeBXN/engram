@@ -76,8 +76,12 @@ def dated_searcher(tmp_path, config=None):
                     config or {"hybrid_weight": 0.0})
 
 
-def test_temporal_boost_is_off_by_default(tmp_path):
-    assert DEFAULT_CONFIG["temporal_weight"] == 0.0
+def test_temporal_and_preferences_on_by_default():
+    assert DEFAULT_CONFIG["temporal_weight"] == 0.4
+    assert DEFAULT_CONFIG["preference_summaries"] is True
+
+
+def test_temporal_boost_is_off_without_config_key(tmp_path):
     hits = dated_searcher(tmp_path).search("what did I buy two weeks ago", no_decay=True, now=NOW)
     assert [h["id"] for h in hits] == ["recent", "two-weeks"]
 

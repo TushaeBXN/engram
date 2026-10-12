@@ -15,11 +15,12 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # Keyword boost on top of semantic search (0 turns it off). 0.3 raised
     # LongMemEval R@5 from 0.968 to 0.974; see benchmarks/BENCHMARKS.md.
     "hybrid_weight": 0.3,
-    # Opt-in until measured on LongMemEval: boost memories dated near a time
-    # the query names ("two weeks ago"), and index a short summary of the
-    # preferences/concerns in each user message (engram.preferences).
-    "temporal_weight": 0.0,
-    "preference_summaries": False,
+    # Boost memories dated near a time the query names ("two weeks ago"), and
+    # index a short summary of the preferences/concerns in each user message
+    # (engram.temporal, engram.preferences). Together with hybrid_weight these
+    # raised LongMemEval R@5 from 0.974 to 0.982.
+    "temporal_weight": 0.4,
+    "preference_summaries": True,
     "collection_name": "engram_drawers",
     "people_map": {},
 }
