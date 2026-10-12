@@ -9,8 +9,9 @@ ChromaDB already installs: no PyTorch, no API key, nothing leaves the machine.
 Turn it on with `"reranker": true` or `engram search --rerank`; the model
 (~90 MB) is downloaded once to `~/.engram/models/` on first use, and never
 while the reranker is off. If it cannot be loaded, search continues without
-it. Both benchmark runners gained `--rerank`. Not on by default until it is
-measured on the full benchmarks.
+it. Both benchmark runners gained `--rerank`. On LoCoMo it raises R@10 from
+0.874 to 0.887 and R@5 from 0.783 to 0.828 (MemPalace hybrid v5: 0.889 /
+0.837). Off by default.
 
 **API contract tests** (`tests/test_public_api.py`) pin the Python calls apps
 such as the Amy companion build on.
