@@ -74,22 +74,27 @@ retrieved sessions, averaged over all questions in all five categories,
 exactly as MemPalace's `locomo_bench.py --granularity session` computes it
 (including its parsing of the evidence IDs).
 
-| Metric          | Semantic | **Default** (`--hybrid --temporal --preferences`) |
-|-----------------|----------|-----------|
-| **R@10**        | 0.844    | **0.874** |
-| R@5             | 0.727    | 0.783     |
-| Perfect (1.0)   | 1,595    | 1,658     |
-| Zero (0.0)      | 231      | 179       |
+| Metric          | Semantic | **Default** (`--hybrid --temporal --preferences`) | Default + `--rerank` |
+|-----------------|----------|-----------|-----------|
+| **R@10**        | 0.844    | **0.874** | **0.887** |
+| R@5             | 0.727    | 0.783     | 0.828     |
+| Perfect (1.0)   | 1,595    | 1,658     | 1,691     |
+| Zero (0.0)      | 231      | 179       | 159       |
 
 By category (R@10), using MemPalace's category names:
 
-| Category           | n   | Semantic | Default |
-|--------------------|-----|----------|---------|
-| open-domain        | 841 | 0.893    | 0.928   |
-| adversarial        | 446 | 0.850    | 0.888   |
-| temporal           | 321 | 0.859    | 0.888   |
-| single-hop         | 282 | 0.717    | 0.734   |
-| temporal-inference | 96  | 0.718    | 0.701   |
+| Category           | n   | Semantic | Default | + rerank |
+|--------------------|-----|----------|---------|----------|
+| open-domain        | 841 | 0.893    | 0.928   | 0.936    |
+| adversarial        | 446 | 0.850    | 0.888   | 0.904    |
+| temporal           | 321 | 0.859    | 0.888   | 0.905    |
+| single-hop         | 282 | 0.717    | 0.734   | 0.761    |
+| temporal-inference | 96  | 0.718    | 0.701   | 0.683    |
+
+The `--rerank` column uses the optional local reranker (ms-marco-MiniLM-L-6-v2,
+ONNX, reordering the top 20 results; `rerank_top` was set before the run). It
+ran on an Apple-silicon Mac mini in under 5 minutes for all 1,986 questions.
+It is off by default in Engram.
 
 The defaults were not changed or tuned for LoCoMo. They help four categories
 and cost temporal-inference about 1.6 points (questions that need facts from

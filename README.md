@@ -55,9 +55,10 @@ On **LoCoMo** (10 long conversations, 1,986 questions, session-level R@10: share
 |---|---|---|
 | Semantic search only, no AI model | **84.4%** | 60.3% |
 | Hybrid, no AI model | 87.4% (Engram's default) | **88.9%** (hybrid v5) |
-| Hybrid R@5 | 78.3% | **83.7%** |
+| Hybrid + local reranker, no API (Engram opt-in) | **88.7%** | — |
+| R@5: default / with local reranker | 78.3% / **82.8%** | **83.7%** (hybrid v5) |
 
-Engram's raw retrieval is 24 points ahead here because it indexes every message (split into chunks) rather than one embedding per session, which the embedding model truncates. MemPalace's LoCoMo hybrid is ahead by 1.5 points at R@10 and 5.4 at R@5; it adds a person-name boost, a quoted-phrase boost and a heavier keyword weight on top of what Engram does. Engram's LoCoMo run uses its LongMemEval defaults unchanged.
+Engram's raw retrieval is 24 points ahead here because it indexes every message (split into chunks) rather than one embedding per session, which the embedding model truncates. MemPalace's LoCoMo hybrid is ahead of Engram's default by 1.5 points at R@10 and 5.4 at R@5; it adds a person-name boost, a quoted-phrase boost and a heavier keyword weight. With Engram's optional local reranker (`"reranker": true`, a 90 MB cross-encoder that runs on your machine, no API key) the gap closes to 0.2 points at R@10 (about 5 of 1,986 questions) and 0.9 at R@5. Engram's LoCoMo runs use its LongMemEval settings unchanged; the reranker reorders the top 20 results, a setting chosen before the run.
 
 MemPalace also publishes ConvoMem and MemBench results and offers LLM reranking, a shared memory hub across machines and Docker images; Engram has none of those yet. Every Engram number above is reproducible with the commands in [benchmarks/BENCHMARKS.md](benchmarks/BENCHMARKS.md).
 
