@@ -205,5 +205,20 @@ def test_cli_shows_rerank_relevance_in_result_order(engram_home, tmp_path, monke
     out = CliRunner(env={"COLUMNS": "200"}).invoke(app, ["search", QUERY]).output
     assert "(reranked)" in out and "Relevance" in out
     assert "0.881" in out  # sigmoid(2.0) for the jazz memory, listed first
+    assert "0.500" in out  # sigmoid(0.0): no shared words
     out = CliRunner(env={"COLUMNS": "200"}).invoke(app, ["search", QUERY, "--no-rerank"]).output
     assert "(reranked)" not in out and "Score" in out
+
+
+def test_cli_marks_tiny_relevance(engram_home, tmp_path, monkeypatch):
+    import engram.cli as cli
+
+    class Unrelated:
+        def score(self, query, texts):
+            return [-9.0] * len(texts)
+
+    s = searcher(tmp_path, reranker=True)
+    monkeypatch.setattr(rr, "get_reranker", lambda cfg: Unrelated())
+    monkeypatch.setattr(cli, "_searcher", lambda *a, **k: s)
+    out = CliRunner(env={"COLUMNS": "200"}).invoke(app, ["search", QUERY]).output
+    assert "<0.001" in out and "0.000" not in out
