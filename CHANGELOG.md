@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+**LoCoMo benchmark.** `benchmarks/locomo_bench.py` replaces the old stub:
+session recall@k over all 1,986 LoCoMo questions, computed the same way as
+MemPalace's runner. Engram scores R@10 0.874 with its defaults (0.844 with
+semantic search alone, against MemPalace's 0.603 raw and 0.889 hybrid v5).
+
 ## 1.3.0
 
 **98.2% R@5 on LongMemEval (R@10 99.2%), with no AI model.** Two new search

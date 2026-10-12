@@ -2,14 +2,14 @@
 
 ## Target Performance
 
-These are goals; measured results are in the next section. The LoCoMo runner is still a stub that returns `"status": "stub"`.
+These are goals; measured results are in the next section.
 
 | Benchmark         | Metric              | Target     | Notes                        |
 |-------------------|---------------------|------------|------------------------------|
 | LongMemEval       | Session recall R@5  | ≥ 0.95     | 500 questions, longmemeval_s |
 | LongMemEval       | Session recall R@10 | ≥ 0.97     | same run                     |
-| LoCoMo            | Entity recall       | ≥ 0.72     | 100-turn social dialogues    |
-| LoCoMo            | Event recall        | ≥ 0.69     | temporal event tracking      |
+| LoCoMo            | Session recall R@10 | ≥ 0.85     | 1,986 questions, locomo10    |
+| LoCoMo            | Session recall R@5  | ≥ 0.75     | same run                     |
 | ES compression    | Factual paragraphs  | ≥ 1.5×     | measured by char ratio       |
 | ES compression    | Code-heavy content  | ≥ 1.1×     | function signatures + bodies |
 | ES compression    | Mixed content       | ≥ 1.4×     | weighted average             |
@@ -63,6 +63,45 @@ and scored on the other 450). The setups differ: Engram indexes assistant messag
 raw mode indexes user turns only, and one question is worth 0.002.
 `--roles user` runs Engram the MemPalace way.
 
+### LoCoMo (locomo10, 10 conversations, 1,986 questions)
+
+Engram 1.3.0, ChromaDB with all-MiniLM-L6-v2, no reranker, no LLM. Run on a
+Linux CPU machine in about 18 minutes per configuration. Each conversation
+is mined once (one room per session, one drawer per turn written as
+`Speaker said, "…"`) and all of its questions are asked against it. Metric:
+for each question, the share of its evidence sessions among the top-k
+retrieved sessions, averaged over all questions in all five categories,
+exactly as MemPalace's `locomo_bench.py --granularity session` computes it
+(including its parsing of the evidence IDs).
+
+| Metric          | Semantic | **Default** (`--hybrid --temporal --preferences`) |
+|-----------------|----------|-----------|
+| **R@10**        | 0.844    | **0.874** |
+| R@5             | 0.727    | 0.783     |
+| Perfect (1.0)   | 1,595    | 1,658     |
+| Zero (0.0)      | 231      | 179       |
+
+By category (R@10), using MemPalace's category names:
+
+| Category           | n   | Semantic | Default |
+|--------------------|-----|----------|---------|
+| open-domain        | 841 | 0.893    | 0.928   |
+| adversarial        | 446 | 0.850    | 0.888   |
+| temporal           | 321 | 0.859    | 0.888   |
+| single-hop         | 282 | 0.717    | 0.734   |
+| temporal-inference | 96  | 0.718    | 0.701   |
+
+The defaults were not changed or tuned for LoCoMo. They help four categories
+and cost temporal-inference about 1.6 points (questions that need facts from
+several sessions, where the time boost has little to anchor on).
+
+For reference, MemPalace reports R@10 0.603 for raw session retrieval and
+0.889 (R@5 0.837) for its hybrid v5, which adds person-name and
+quoted-phrase boosts and a heavier keyword weight. Its raw mode embeds each
+whole session as one document, which the embedding model truncates; Engram
+indexes every turn, which is where most of its 24-point lead on raw
+retrieval comes from.
+
 ES compression: 1.6× factual, 1.1× code, 1.5× mixed.
 
 ## LongMemEval: how it is measured
@@ -115,8 +154,13 @@ used to test the runner; its scores are not benchmark results.
 # LongMemEval (requires longmemeval dataset, see above)
 python benchmarks/longmemeval_bench.py ~/datasets/longmemeval/longmemeval_s_cleaned.json
 
-# LoCoMo (requires locomo dataset)  
-python benchmarks/locomo_bench.py --data-dir ~/datasets/locomo
+# LoCoMo (dataset: one JSON file from GitHub)
+mkdir -p ~/datasets/locomo
+curl -fsSL -o ~/datasets/locomo/locomo10.json \
+  https://raw.githubusercontent.com/snap-research/locomo/main/data/locomo10.json
+python benchmarks/locomo_bench.py ~/datasets/locomo/locomo10.json                # semantic
+python benchmarks/locomo_bench.py ~/datasets/locomo/locomo10.json \
+  --hybrid --temporal --preferences --out locomo_default.jsonl                   # Engram's default
 
 # ES compression ratio
 python benchmarks/longmemeval_bench.py --compression-only
