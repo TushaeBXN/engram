@@ -1,543 +1,390 @@
 # Engram
 <img width="1408" height="768" alt="Gemini_Generated_Image_9nr9z59nr9z59nr9" src="https://github.com/user-attachments/assets/e04422f2-1974-48c2-8568-238bc2641bdf" />
 
-
-> **Small, private, verbatim memory for your AI — set up in a minute, readable in an afternoon.**
-
-**98.8% R@5 on LongMemEval with no LLM and no API calls, ahead of MemPalace's best no-LLM score (98.4%).** That is with Engram's optional local reranker (`engram setup-reranker`); out of the box it scores 98.2%. Free, local, one `pip install`. ([results](#engram-and-mempalace))
+> **Long-term memory for your AI that stays on your computer.** Free, private, word-for-word, and small enough to read in an afternoon.
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/)
+[![PyPI](https://img.shields.io/pypi/v/engram-chateau)](https://pypi.org/project/engram-chateau/)
 [![CI](https://github.com/TushaeBXN/engram/actions/workflows/ci.yml/badge.svg)](https://github.com/TushaeBXN/engram/actions/workflows/ci.yml)
 
-Engram gives Claude (and any MCP client) a long-term memory that lives on your machine. It keeps every note, file and conversation **word for word**, organises them into wings and rooms, and finds them again with semantic search. No cloud, no API key, no account.
+**98.8% on LongMemEval** (the right conversation in the top 5 for 494 of 500 questions) with no LLM, no API key and nothing leaving your machine. That is ahead of MemPalace's best no-LLM score (98.4%). [See the numbers](#how-well-does-it-work)
 
-## Why Engram
+---
 
-- **Small enough to read.** About 6,300 lines of Python in 33 files. You can audit everything that touches your data in an afternoon.
-- **Two commands to set up.** Install, run `engram install-hooks`, and Claude Code saves your work and conversations automatically.
-- **Verbatim, not summarised.** Drawers store your original text. Compression is only used for the small context Engram loads into a model.
-- **Private by default.** Everything stays under `~/.engram/`. Nothing is sent anywhere.
-- **Honest numbers.** Benchmarks are reproducible from this repo, and unmeasured goals are labelled as goals ([details](#benchmark-targets)).
+## What is Engram?
 
-## Set up in 60 seconds
+AI assistants forget everything when a chat ends. Engram gives them a memory that lasts.
+
+- It **saves** your notes, files and conversations, word for word.
+- It **organises** them by project and topic.
+- When you (or Claude) ask a question later, it **finds** the right memory, even if you use different words than the original.
+
+Everything lives in a folder on your computer (`~/.engram/`). There is no account, no cloud and no API key. It works with **Claude Code**, **Claude Desktop** and any app that speaks **MCP**, and it is a plain Python library you can build on.
+
+---
+
+## Should you use Engram?
+
+There are several good memory tools. Here is an honest guide to picking one.
+
+| If you want… | Use | Why |
+|---|---|---|
+| Memory for **Claude Code / Claude Desktop** that just works, stays private and costs nothing | **Engram** | Two commands to set up; hooks save your work automatically; nothing leaves your machine |
+| A memory **library for your own AI app or companion** (an agent, a chatbot, a personal assistant) | **Engram** | Small, readable Python API; runs offline; no per-call costs |
+| To **read and trust** every line of code that touches your data | **Engram** | About 6,900 lines of Python; MIT licensed |
+| The **largest, most feature-rich** local memory system: LLM reranking, a memory hub shared across machines, Docker, more published benchmarks | **[MemPalace](https://github.com/MemPalace/mempalace)** | The project Engram's design is based on; bigger and more mature |
+| Memory for a **multi-user product** hosted in the cloud, with a dashboard and an API | **A hosted memory service** (for example Mem0, Zep or Supermemory) | Built for teams and production apps; they usually need an account, an API key and an LLM to decide what to remember |
+| Just a few standing rules or facts ("use tabs", "my name is…") | **Claude's built-in memory or a `CLAUDE.md` file** | No install needed for small, fixed notes |
+
+**Pick Engram when** you want strong recall, privacy, zero running cost and code you can understand. **Look elsewhere when** you need a hosted multi-user service, or MemPalace's extra features such as LLM reranking or a shared hub.
+
+### Three ways people use it
+
+1. **A developer using Claude Code.** Engram saves every file Claude edits and every conversation before it is compacted. Next week, "why did we switch the auth library?" gets the actual discussion back.
+2. **Someone building an AI companion.** The companion stores what it learns about you, keeps a diary and a knowledge graph of people and facts, and recalls them later, all offline. (Engram started as the memory layer for exactly this kind of app.)
+3. **A researcher or writer.** Point Engram at a folder of notes, an Obsidian vault, or Notion or Linear exports, then ask questions across everything.
+
+---
+
+## Set up in 2 minutes
+
+**1. Install** (Python 3.9 or newer):
 
 ```bash
-pip install engram-chateau                            # Python 3.9+ (or: uv tool install engram-chateau)
-engram init ~/myproject                                # create your memory château
-engram install-hooks                                   # auto-save from Claude Code (prints a settings.json snippet)
-claude mcp add engram -- python -m engram.mcp_server   # give Claude the 22 engram_* tools
+pip install engram-chateau        # or, with uv:  uv tool install engram-chateau
 ```
 
-Then ask Claude to search or remember things, or use the CLI: `engram mine ~/myproject --wing myapp`, `engram search "auth decisions"`.
+> The package is called `engram-chateau` on PyPI, but the command and `import` are just `engram`. The package named `engram` on PyPI is an unrelated project.
 
-## Engram and MemPalace
-
-Engram's design (wings, rooms, halls, drawers, a temporal knowledge graph) is inspired by [MemPalace](https://github.com/MemPalace/mempalace), a much larger and more mature project. Engram aims to be the small one: the same core ideas in a codebase one person can read, with a two-line setup. Here is how the two compare on LongMemEval (500 questions, session-level R@5: is the right conversation in the top 5 results?):
-
-| LongMemEval R@5 | Engram | MemPalace |
-|---|---|---|
-| Semantic search only, no AI model | **96.8%** | 96.6% |
-| Hybrid: keywords only, no AI model | 97.4% | — |
-| Hybrid: keywords + time + preferences, no AI model | 98.2% (Engram's default) | 98.4% (hybrid v4, held-out 450 questions) |
-| Hybrid + **local** reranker, no LLM, no API | **98.8%** (opt-in: `engram setup-reranker`) | — |
-| Hybrid + LLM reranking (API key) | not offered | ≥ 99% |
-| R@1: default / with local reranker | 88.8% / **92.4%** | — |
-| R@10: default / with local reranker | **99.2%** / 99.0% | — |
-
-Engram's numbers come from one full run each on a Mac mini with the default local embedding model (all-MiniLM-L6-v2); MemPalace's are from [its README](https://github.com/MemPalace/mempalace#benchmarks). The setups differ, so read this as "level on raw retrieval":
-
-- Engram indexes assistant messages as well as yours; MemPalace's raw mode indexes your messages only. That is why Engram answers every "what did you tell me about…" question.
-- Both hybrids boost keywords, times the question names and preferences you mentioned. Engram's versions are general rules written without looking at the benchmark's missed questions, and are scored on all 500 questions; MemPalace's v4 was tuned on 50 questions and scored on the other 450.
-- One question is worth 0.2 points: 98.2% vs 98.4% is one question.
-
-On **LoCoMo** (10 long conversations, 1,986 questions, session-level R@10: share of the sessions holding the answer that are in the top 10 results), measured the same way MemPalace measures it:
-
-| LoCoMo R@10 | Engram | MemPalace |
-|---|---|---|
-| Semantic search only, no AI model | **84.4%** | 60.3% |
-| Hybrid, no AI model | 87.4% (Engram's default) | **88.9%** (hybrid v5) |
-| Hybrid + local reranker, no API (Engram opt-in) | **88.7%** | — |
-| R@5: default / with local reranker | 78.3% / **82.8%** | **83.7%** (hybrid v5) |
-
-Engram's raw retrieval is 24 points ahead here because it indexes every message (split into chunks) rather than one embedding per session, which the embedding model truncates. MemPalace's LoCoMo hybrid is ahead of Engram's default by 1.5 points at R@10 and 5.4 at R@5; it adds a person-name boost, a quoted-phrase boost and a heavier keyword weight. With Engram's optional local reranker (`"reranker": true`, a 90 MB cross-encoder that runs on your machine, no API key) the gap closes to 0.2 points at R@10 (about 5 of 1,986 questions) and 0.9 at R@5. Engram's LoCoMo runs use its LongMemEval settings unchanged; the reranker reorders the top 20 results, a setting chosen before the run.
-
-MemPalace also publishes ConvoMem and MemBench results and offers LLM reranking, a shared memory hub across machines and Docker images; Engram has none of those yet. Every Engram number above is reproducible with the commands in [benchmarks/BENCHMARKS.md](benchmarks/BENCHMARKS.md).
-
----
-
-## Why local memory?
-
-| | Engram | Cloud memory tools |
-|---|---|---|
-| Cold-start context | Designed for **~170 tokens** (L0 + L1, not yet measured) | Varies |
-| Install | One `pip install engram-chateau` | Often Docker + cloud signup |
-| API key required | **No** | Usually |
-| Data leaves your machine | **Never** | Yes |
-| Compression | **ES shorthand** for context (~1.6× on prose) | — |
-| Open source | **MIT** | Often proprietary |
-
----
-
-## Benchmark Targets
-
-LongMemEval, LoCoMo and ES compression are measured. On LongMemEval (500 questions, all-MiniLM-L6-v2 on ChromaDB, no LLM, no reranker, no API calls) Engram's default search puts the right session in the top 5 for **98.2%** of questions and in the top 10 for 99.2% (semantic search alone: 96.8% and 98.6%); with the optional local reranker, R@5 is **98.8%**. On LoCoMo it reaches 87.4% session R@10 (semantic alone: 84.4%; with the local reranker: 88.7%). See [Engram and MemPalace](#engram-and-mempalace) for the comparison, and [benchmarks/BENCHMARKS.md](benchmarks/BENCHMARKS.md) for the per-type breakdown and how to reproduce.
-
-| Benchmark            | Metric              | Target    | Status                  |
-|----------------------|---------------------|-----------|-------------------------|
-| LongMemEval          | Session recall R@5  | ≥ 0.95    | 0.982 measured          |
-| LongMemEval          | Session recall R@10 | ≥ 0.97    | 0.992 measured          |
-| LoCoMo               | Session recall R@10 | ≥ 0.85    | 0.874 measured          |
-| LoCoMo               | Session recall R@5  | ≥ 0.75    | 0.783 measured          |
-| ES compression       | Factual paragraphs  | ≥ 1.5×    | 1.6× measured           |
-| ES compression       | Code-heavy content  | ≥ 1.1×    | 1.1× measured           |
-| ES compression       | Mixed               | ≥ 1.4×    | 1.5× measured           |
-| Cold-start context   | L0 + L1 tokens      | ≤ 170     | Not yet measured        |
-| Search latency p99   | ChromaDB 100k       | < 200ms   | Not yet measured        |
-| Search latency p99   | FAISS 100k          | < 50ms    | Not yet measured        |
-
----
-
-## Quick Start
-
-> **Note:** Engram is published on PyPI as **`engram-chateau`**; the command and `import engram` are just `engram`. The package named `engram` on PyPI is an unrelated project.
+**2. Create your memory and connect Claude:**
 
 ```bash
-# Install
-pip install engram-chateau                 # or: uv tool install engram-chateau
-pip install git+https://github.com/TushaeBXN/engram   # latest unreleased code from main
+engram init ~/myproject                                # set up your memory and add a project
+claude mcp add engram -- python -m engram.mcp_server   # give Claude the engram_* tools
+engram install-hooks                                   # optional: auto-save from Claude Code
+```
 
-# Or with optional backends
-pip install "engram-chateau[faiss]"         # FAISS speed backend
-pip install "engram-chateau[sqlitevec]"     # zero-dependency fallback
-pip install "engram-chateau[viz]"           # graph visualisation (matplotlib + networkx)
-pip install "engram-chateau[all]"           # everything
+`engram install-hooks` prints a short snippet to paste into `~/.claude/settings.json`.
 
-# Initialise your memory château
-engram init ~/myproject
+**3. Optional: switch on the best-accuracy mode:**
 
-# Mine a project directory
-engram mine ~/myproject --wing myapp
+```bash
+engram setup-reranker      # downloads a 90 MB model once; everything still runs locally
+```
 
-# Mine a conversation export
-engram mine ~/Downloads/claude-export --mode convos --wing myapp
+**That's it.** Ask Claude to remember or look something up, or use the command line:
 
-# Search
-engram search "auth migration decisions" --wing myapp
-
-# Answer a question grounded in memory (uses Ollama if available)
-engram answer "What did we decide about the auth strategy?" --wing myapp
-
-# Store a typed, validated memory
-engram remember-type "Always prefer float32 on CPU because bfloat16 is unsupported" \
-  instruction --wing myapp --confidence 0.95
-
-# Load cold-start context (~170 tokens)
-engram wake-up
+```bash
+engram mine ~/myproject --wing myapp          # save a project's files
+engram search "why did we change the auth library"
 ```
 
 ---
 
-## Memory Château Architecture
+## How it works
+
+**1. Everything is saved word for word.** Each note, file or message becomes a *drawer*: your original text, never summarised.
+
+**2. Drawers are organised like a building.** You don't need to manage this; Engram sorts things automatically.
 
 ```
-Wing  (person or project)
-  └── Room  (named topic: "auth-migration", "ci-pipeline")
-        ├── Hall  (memory type: facts | events | discoveries | preferences | advice)
-        │     ├── Closet  (ES-compressed summary — fast AI read)
-        │     └── Drawer  (verbatim original — never summarised)
-        └── Tunnel  (cross-wing link when same room spans multiple wings)
+Wing   – a person or project        (e.g. "myapp")
+└── Room  – a topic                 (e.g. "auth-migration")
+    └── Hall – the kind of memory   (facts, events, discoveries, preferences, advice)
+        └── Drawer – the original text
 ```
 
-Mined notes and conversation messages are sorted into halls by their **content** (e.g. "I prefer…" → preferences, "turns out the root cause…" → discoveries) using a local, rule-based classifier (`engram/classifier.py`). Code and config files keep their extension-based hall; when nothing matches clearly, the old extension/role default is used.
+**3. Search finds the right drawer.** When you ask a question, Engram combines several signals:
 
-### Memory Layers
+| Signal | What it does | On by default? |
+|---|---|---|
+| Meaning | Finds text that means the same thing, even with different words | Yes |
+| Keywords | Gives extra weight to results that share your exact words, names or numbers | Yes |
+| Time | "What did I buy **two weeks ago**?" favours memories from around that date | Yes |
+| Preferences | Notices things you mentioned in passing ("I've been struggling with my sleep") so later questions find them | Yes |
+| Recency | Slightly favours newer memories; pinned memories are never pushed down | Yes |
+| Reranker | A small local model re-reads the top 20 results and puts the best first | Optional (`engram setup-reranker`) |
 
-| Layer | Content                        | Size       | When Loaded              |
-|-------|--------------------------------|------------|--------------------------|
-| L0    | Identity — who is this AI?     | ~50 tokens | Always                   |
-| L1    | Critical facts in ES           | ~120 tokens| Always                   |
-| L2    | Room recall — current project  | On demand  | When topic arises        |
-| L3    | Deep semantic search           | On demand  | When explicitly queried  |
-
-Total cold-start context: **~170 tokens** (L0 + L1 only).
+**4. Short "wake-up" context.** At the start of a session Engram can hand the AI a short summary (who it is, plus key facts), designed to fit in about 170 tokens, so it doesn't start from zero.
 
 ---
 
-## Using with Claude via MCP
+## How well does it work?
 
-**Claude Code:**
+Two public benchmarks measure whether a memory system can find the right past conversation for a question. Both are reproducible from this repo ([how](benchmarks/BENCHMARKS.md)).
+
+**LongMemEval:** 500 questions over long chat histories. The score is how often the right conversation is in the top 5 results.
+
+| | Engram | MemPalace |
+|---|---|---|
+| Meaning-only search | **96.8%** | 96.6% |
+| Default search (no AI model) | 98.2% | 98.4% |
+| With local reranker (no LLM, no API) | **98.8%** | — |
+| With an LLM reranker (needs an API key) | not offered | 99%+ |
+
+**LoCoMo:** 1,986 questions over 10 very long conversations. The score is how many of the answer's sessions are in the top 10 results.
+
+| | Engram | MemPalace |
+|---|---|---|
+| Meaning-only search | **84.4%** | 60.3% |
+| Default search (no AI model) | 87.4% | **88.9%** |
+| With local reranker (no LLM, no API) | 88.7% | — |
+
+**In short:** Engram's plain search is as good as or better than MemPalace's, and its tuned search is level with MemPalace's: ahead on LongMemEval, 0.2 points behind on LoCoMo. Engram never needs an LLM or an API to get there.
+
+Things to know when comparing:
+- **Model:** all numbers use the same small local embedding model (all-MiniLM-L6-v2).
+- **What gets indexed:** Engram indexes the assistant's messages as well as yours; MemPalace's raw mode indexes only yours.
+- **How the hybrids were tuned:** MemPalace tuned its LongMemEval hybrid on 50 questions and scored the other 450. Engram's settings were written as general rules and scored on all 500, then used unchanged on LoCoMo.
+- **Scale:** one LongMemEval question is worth 0.2 points.
+
+Per-question-type results are in [benchmarks/BENCHMARKS.md](benchmarks/BENCHMARKS.md).
+
+---
+
+## Using Engram with Claude
+
+### Claude Code
 
 ```bash
 claude mcp add engram -- python -m engram.mcp_server
+engram install-hooks
 ```
 
-**Claude Desktop:** add this to `claude_desktop_config.json` (macOS: `~/Library/Application Support/Claude/`, Windows: `%APPDATA%\Claude\`):
+- **The MCP server** gives Claude 22 `engram_*` tools: search, add a memory, wake-up context, a knowledge graph, replaying a topic's history and more. See [`examples/mcp_setup.md`](examples/mcp_setup.md).
+- **The save hook** stores every file Claude writes or edits. Saving the same file again replaces it rather than duplicating it.
+- **The pre-compact hook** stores the conversation before Claude Code compacts it: your messages and Claude's replies, not tool output. Running it twice adds no duplicates.
+
+Optional settings for the hooks: `ENGRAM_WING` (default `default`), `ENGRAM_ROOM` (default `conversation`) and `ENGRAM_AGENT` (default `claude-code`).
+
+### Claude Desktop
+
+Add this to `claude_desktop_config.json`. On macOS it lives in `~/Library/Application Support/Claude/`, on Windows in `%APPDATA%\Claude\`:
 
 ```json
 {
   "mcpServers": {
-    "engram": {
-      "command": "python",
-      "args": ["-m", "engram.mcp_server"]
-    }
+    "engram": { "command": "python", "args": ["-m", "engram.mcp_server"] }
   }
 }
 ```
 
-Use the full path to the Python that has Engram installed if `python` on your PATH is a different one.
-
-Claude will then have access to all 22 `engram_*` tools including `engram_wake_up`,
-`engram_search`, `engram_add_memory`, `engram_kg_add`, `engram_replay`, and more.
-
-See [`examples/mcp_setup.md`](examples/mcp_setup.md) for the full tool list.
+If `python` isn't the one with Engram installed, use its full path.
 
 ---
 
-## Using with Local Models
-
-Engram works entirely offline. The vector backends use local embeddings:
+## Using Engram in your own app (Python)
 
 ```python
+from engram.agents import AgentDiary
 from engram.backends import get_backend
-from engram.palace import Palace
+from engram.chateau import Chateau
+from engram.knowledge_graph import KnowledgeGraph
 from engram.searcher import Searcher
 
-palace = Palace()
-backend = get_backend("chromadb")   # or "faiss" / "sqlitevec"
-searcher = Searcher(backend, palace)
+memory = Chateau()                                  # your memory folder (~/.engram/chateau)
+searcher = Searcher(get_backend("chromadb"), memory)
 
-results = searcher.search("auth migration")
-for r in results:
-    print(r["text"], r["final_score"])
+for hit in searcher.search("what music does Brian like", n=5):
+    print(hit["text"], hit["final_score"])
+
+AgentDiary("my-assistant").write("Helped plan the week")              # an agent's diary
+KnowledgeGraph().add(subject="Brian", predicate="likes", obj="jazz")  # facts about people and things
 ```
 
-No model API required. ChromaDB embeds locally using its bundled models.
+These calls are pinned by `tests/test_public_api.py`, so apps built on them keep working across releases.
 
 ---
 
-## Full CLI Reference
+## Everyday commands
+
+```bash
+# Save things
+engram mine ~/project --wing myapp                 # a project's files
+engram mine ~/Downloads/claude-export --mode convos --wing myapp   # a conversation export
+engram watch ~/project --wing myapp                # keep saving as files change
+
+# Find things
+engram search "auth decisions" --wing myapp
+engram answer "What did we decide about the database?"   # an answer from memory (uses Ollama if installed)
+engram replay --room auth-migration                # a topic's history, in order
+
+# Context and upkeep
+engram wake-up                                     # the short start-of-session context
+engram status                                      # what's in your memory
+engram audit --fix                                 # health check and safe fixes
+```
+
+<details>
+<summary><b>Full command reference</b></summary>
 
 ### Setup
-
 ```bash
-engram init <dir>                              # guided onboarding + ES bootstrap
+engram init <dir>                              # guided setup
+engram install-hooks                           # Claude Code hooks
+engram setup-reranker                          # download the reranker model and turn it on
+engram setup-reranker --disable                # turn the reranker off
 ```
 
-### Mining
-
+### Saving
 ```bash
-engram mine <dir>                              # mine project files
-engram mine <dir> --mode convos                # mine conversation exports
-engram mine <dir> --mode convos --wing myapp   # tag with a wing
-engram mine <dir> --since 2026-01-01           # skip files older than date
-engram mine <dir> --plugin obsidian            # use Obsidian vault plugin
-engram mine <dir> --plugin notion              # Notion export
-engram mine <dir> --plugin linear              # Linear issues export
+engram mine <dir>                              # project files
+engram mine <dir> --mode convos                # conversation exports (Claude, ChatGPT, Slack, Claude Code)
+engram mine <dir> --wing myapp --room auth     # choose the wing and room
+engram mine <dir> --since 2026-01-01           # skip older files
+engram mine <dir> --plugin obsidian            # also: notion, linear
+engram watch <dir> --wing myapp                # auto-save on change
+engram split <dir> [--dry-run]                 # split concatenated transcripts
+engram remember-type "Prefer SQLite for local dev" preference --wing myapp
+engram remember-type --list                    # the 13 memory types
 ```
 
-### Watch Mode
-
+### Searching
 ```bash
-engram watch <dir>                             # auto-mine on file changes
-engram watch <dir> --wing myapp --mode convos  # tag + conversation mode
+engram search "query" [--wing W] [--room R] [--results 20]
+engram search "query" --no-decay               # ignore recency
+engram search "query" --no-hybrid              # meaning only
+engram search "query" --rerank / --no-rerank   # force the reranker on or off for one search
+engram answer "question" [--wing W] [--model llama3.2] [--chunks 8]
 ```
 
-### Search
-
+### Context, history and graph
 ```bash
-engram search "query"
-engram search "query" --wing myapp
-engram search "query" --room auth-migration
-engram search "query" --no-decay               # disable recency weighting
-engram search "query" --no-hybrid              # semantic only (keyword boost is on by default)
-engram search "query" --rerank                 # reorder the top results with the local reranker (optional)
-engram setup-reranker                          # download the reranker model once and turn reranking on
-engram search "query" --results 20             # max results
-```
-
-### Memory Stack
-
-```bash
-engram wake-up                                 # L0 + L1 context dump (~170 tokens)
-engram wake-up --wing myapp                    # wing-scoped L1
-engram wake-up --rebuild                       # rebuild L1 from drawers
-```
-
-### Compression
-
-```bash
-engram compress                                # ES compress all closets
-engram compress --wing myapp                   # wing-scoped
-engram compress --wing myapp --room auth       # room-scoped
-```
-
-### Knowledge Graph
-
-```bash
-engram kg query "Kai"
-engram kg query "Kai" --all                    # include expired triples
+engram wake-up [--wing W] [--rebuild]
+engram replay --room R [--wing W] [--type decision] [--since 2026-06-01] [--min-confidence 0.8]
+engram kg query "Kai" [--all]
 engram kg add "Kai" works_on "Orion" --from 2025-06-01
 engram kg invalidate "Kai" works_on "Orion" --ended 2026-03-01
 engram kg timeline "auth-migration"
-```
-
-### Answer (LLM-grounded QA)
-
-```bash
-engram answer "What auth approach did we choose?"
-engram answer "What did we decide about the DB?" --wing myapp
-engram answer "Why did we drop Redis?" --model llama3.2 --chunks 8
-```
-
-### Typed Memory
-
-```bash
-# Store a categorised, validated memory
-engram remember-type "Prefer SQLite for local dev" preference --wing myapp
-engram remember-type "Use float32 on CPU because bfloat16 unsupported" \
-  instruction --wing anthos --confidence 0.95
-
-# List all 13 valid types
-engram remember-type --list
-```
-
-### Provenance
-
-```bash
-engram provenance <drawer-id>                  # provenance record for one memory
-engram provenance <drawer-id> --history        # full version chain
-engram provenance --summary                    # source counts across château
-```
-
-### Graph Visualisation
-
-```bash
-pip install "engram-chateau[viz]"
-engram graph                                   # all wings → memory_graph.png
-engram graph --wing myapp --output myapp.png   # scoped to one wing
+engram graph [--wing W] [--output file.png]   # needs: pip install "engram-chateau[viz]"
 ```
 
 ### Maintenance
-
 ```bash
-engram conflicts                               # interactive TUI conflict resolver
-engram audit                                   # health check
-engram audit --fix                             # auto-resolve safe issues
-engram replay --room auth-migration            # chronological room story
-engram replay --room auth-migration --wing myapp
-engram replay --room auth-migration --type decision          # filter by type
-engram replay --room auth-migration --since 2026-06-01       # filter by date
-engram replay --room auth-migration --min-confidence 0.8     # filter by confidence
-engram status                                  # château overview
-engram split <dir>                             # split concatenated transcripts
-engram split <dir> --dry-run
+engram status
+engram audit [--fix]
+engram conflicts                               # resolve contradicting memories
+engram compress [--wing W] [--room R]          # rebuild short summaries (ES)
+engram provenance <drawer-id> [--history]
+engram provenance --summary
+engram ui                                      # local notes app at http://127.0.0.1:7741
 ```
+</details>
 
 ---
 
-## Configuration
+## Settings
 
-**`~/.engram/config.json`**
+Settings live in `~/.engram/config.json`. Every key is optional, and the defaults are the benchmarked setup.
 
-```json
-{
-  "chateau_path": "~/.engram/chateau",
-  "vector_backend": "chromadb",
-  "decay_factor": 0.005,
-  "decay_max_days": 90,
-  "hybrid_weight": 0.3,
-  "temporal_weight": 0.4,
-  "preference_summaries": true,
-  "collection_name": "engram_drawers",
-  "people_map": {}
-}
-```
+| Setting | Default | What it does |
+|---|---|---|
+| `vector_backend` | `chromadb` | Search engine: `chromadb`, `faiss` or `sqlitevec` (no compiled parts) |
+| `hybrid_weight` | `0.3` | Keyword boost; `0` turns it off |
+| `temporal_weight` | `0.4` | Boost for memories near a time the question names; `0` turns it off |
+| `preference_summaries` | `true` | Index a short summary of preferences and concerns mentioned in your messages |
+| `reranker` | `false` | Local reranker; switch on with `engram setup-reranker`. While off, Engram never downloads anything |
+| `rerank_top` | `20` | How many top results the reranker reorders |
+| `decay_factor` / `decay_max_days` | `0.005` / `90` | How much newer memories are favoured, and for how long |
+| `chateau_path` | `~/.engram/chateau` | Where memories are stored |
 
-| Key              | Default              | Description                                           |
-|------------------|----------------------|-------------------------------------------------------|
-| `chateau_path`   | `~/.engram/chateau`  | Root of the château filesystem                        |
-| `vector_backend` | `chromadb`           | `chromadb` \| `faiss` \| `sqlitevec`                  |
-| `decay_factor`   | `0.005`              | Recency boost per day: `score * (1 + factor * days)` |
-| `decay_max_days` | `90`                 | Days after which decay levels off                     |
-| `hybrid_weight`  | `0.3`                | Keyword boost for hybrid search: `score * (1 + weight * overlap)`; `0` for semantic only (CLI and MCP) |
-| `temporal_weight`| `0.4`                | Boost for memories dated near a time the query names ("two weeks ago"); `0` to turn off |
-| `preference_summaries` | `true`         | Index a "User has mentioned: …" summary with user messages that state preferences or concerns (applies to newly mined conversations) |
-| `reranker`       | `false`              | Reorder the top results with a local cross-encoder (ms-marco-MiniLM, ONNX, no API key). `engram setup-reranker` downloads the ~90 MB model once and turns this on; `engram setup-reranker --disable` turns it off. While `false`, Engram makes no network calls for it |
-| `rerank_top`     | `20`                 | How many top results the reranker reorders |
-| `collection_name`| `engram_drawers`     | ChromaDB collection name                              |
-
-`ENGRAM_VECTOR_BACKEND` overrides `vector_backend` for a single run without editing the file, e.g. `ENGRAM_VECTOR_BACKEND=sqlitevec engram search "auth"`.
-
-### Troubleshooting: ChromaDB fails to load
-
-ChromaDB 1.x ships compiled Rust bindings (`chromadb_rust_bindings`). If they don't match your Python or platform, Engram prints a `ChromaDB failed to load` message instead of starting. Fix it by reinstalling (`pip install --force-reinstall --no-cache-dir chromadb`) or by switching to the `sqlitevec` backend, which needs no compiled dependencies. Each backend keeps its own index, so re-run `engram mine` after switching.
-
-**`~/.engram/identity.txt`** — plain text, becomes your L0 context.
-
-**`~/.engram/wing_config.json`** — generated by `engram init`.
+`ENGRAM_VECTOR_BACKEND=sqlitevec engram …` overrides the backend for one run. `~/.engram/identity.txt` holds the short identity that starts each wake-up context.
 
 ---
 
-## Module Reference
+## Troubleshooting
 
-| File                          | Description                                         |
-|-------------------------------|-----------------------------------------------------|
-| `engram/chateau.py`           | Wing/Room/Hall/Closet/Drawer data model             |
-| `engram/config.py`            | Config loading, `~/.engram/` management             |
-| `engram/shorthand.py`         | Engram Shorthand (ES) compression dialect           |
-| `engram/knowledge_graph.py`   | Temporal KG, SQLite backend                         |
-| `engram/miner.py`             | Project file ingest pipeline                        |
-| `engram/convo_miner.py`       | Conversation export ingest (Claude, ChatGPT, Slack) |
-| `engram/searcher.py`          | Semantic search + recency weighting                 |
-| `engram/layers.py`            | L0–L3 memory stack                                  |
-| `engram/watcher.py`           | FSEvents/inotify watch mode                         |
-| `engram/conflict.py`          | Contradiction detection + TUI resolver              |
-| `engram/audit.py`             | Memory health audit                                 |
-| `engram/replay.py`            | Session/room replay                                 |
-| `engram/qa.py`                | LLM-grounded QA over memory (Ollama + fallback)     |
-| `engram/typed_memory.py`      | 13-type typed memory with validation + ES storage   |
-| `engram/provenance.py`        | Memory provenance and version-chain tracking        |
-| `engram/agents.py`            | Specialist agent diary system                       |
-| `engram/chateau_graph.py`     | Room navigation graph                               |
-| `engram/onboarding.py`        | Guided init + ES bootstrap                          |
-| `engram/cli.py`               | Typer CLI entry point                               |
-| `engram/mcp_server.py`        | MCP server — 22 tools                               |
-| `engram/backends/base.py`     | Abstract VectorBackend interface                    |
-| `engram/backends/chromadb_backend.py` | ChromaDB backend (default)                |
-| `engram/backends/faiss_backend.py`    | FAISS backend (speed-optimised)           |
-| `engram/backends/sqlitevec_backend.py`| sqlite-vec backend (zero-dependency)     |
-| `engram/plugins/obsidian.py`  | Obsidian vault plugin miner                         |
-| `engram/plugins/notion.py`    | Notion export plugin miner                          |
-| `engram/plugins/linear.py`    | Linear issues plugin miner                          |
-| `engram/hooks/engram_save_hook.sh` | Claude Code auto-save hook                    |
-| `engram/hooks/engram_precompact_hook.sh` | Claude Code pre-compact hook             |
+- **`pip: command not found`.** Inside a `uv` virtual environment, use `uv pip install …`.
+- **"No such command" after updating from GitHub.** Run `git pull origin main`, then `uv pip install -e .` (or `pip install -e .`) in your Engram folder.
+- **"ChromaDB failed to load".** ChromaDB's compiled parts don't match your Python. Try `pip install --force-reinstall --no-cache-dir chromadb`, or set `"vector_backend": "sqlitevec"`, which needs no compiled parts. Then re-run `engram mine`, because each backend keeps its own index.
+- **Python 3.15 or newer.** ChromaDB can't install yet (its onnxruntime dependency has no build for it), so Engram installs without it and uses `sqlitevec`. That backend matches words rather than meaning. For meaning-based search, use Python 3.11–3.14.
+- **The search Relevance column shows `<0.001`.** The reranker found nothing that really answers that question; try a more specific one.
 
 ---
 
-## Engram Shorthand (ES)
+<details>
+<summary><b>More: shorthand compression, memory layers, web UI, code map</b></summary>
 
-ES is a compact shorthand that any LLM can read without a decoder. It is used for the context Engram loads into a model (L1 facts, closets); drawers always keep your original text. ES is lossy: filler words such as "the" and "that" are dropped, and `decompress()` only expands unambiguous symbols such as `∴` and `→`. Expect about 1.6× on prose and 1.1× on code.
+### Engram Shorthand (ES)
+
+A compact text form any LLM can read without a decoder. It's used only for the short context Engram loads into a model; your drawers always keep the original text. ES is lossy: it drops filler words. It saves about 1.6× on prose and 1.1× on code.
 
 ```python
-from engram.shorthand import compress, decompress
-
-text = (
-    "The authentication module is a critical component that has a dependency "
-    "on the database and is responsible for verifying user credentials."
-)
-
-es = compress(text, confidence=4)
-# → "auth module=★★ component +dep on db&owns: verifying user credentials. [★★★★]"
-
-decompress(es)
-# → expands unambiguous symbols (∴, →, ¬ …) back to words
-
-# Code-aware compression
-code = "def authenticate(user: str, token: str) -> bool:"
-compress(code, is_code=True)
-# → "fn:authenticate(user: str,token: str)->bool"
-
-# Diff notation
-compress("+add_middleware()\n-manual_verify()", is_diff=True, diff_filename="auth.py")
-# → "CHANGE:auth.py add:add_middleware() rm:manual_verify()"
+from engram.shorthand import compress
+compress("The authentication module is a critical component that has a dependency on the database.")
+# → "auth module=★★ component +dep on db."
 ```
 
----
+### Memory layers
 
-## Recency Weighting
+| Layer | Content | Size | Loaded |
+|---|---|---|---|
+| L0 | Identity: who the AI is | ~50 tokens | Always |
+| L1 | Key facts, in shorthand | ~120 tokens | Always |
+| L2 | The current topic's memories | On demand | When the topic comes up |
+| L3 | Full search | On demand | When asked |
 
-```
-final_score = semantic_score × (1 + recency_boost)
-recency_boost = decay_factor × max(0, decay_max_days − age_days)
-```
+### Web UI
 
-Pinned drawers (`engram_pin`) bypass decay entirely.
+`engram ui` opens a local notes app at http://127.0.0.1:7741, with a graph of linked notes, tags, pinned notes, a daily journal and Markdown editing. It keeps its notes in your browser for now, and doesn't yet show the memories in `~/.engram/`; use `engram search` or the MCP tools for those.
 
----
-
-## Claude Code Hooks
-
-Two hooks keep Engram up to date while you work in Claude Code:
-
-- **Save hook** (PostToolUse): every file Claude writes or edits is mined into the château. Re-saving a file replaces its drawer instead of adding a duplicate.
-- **Pre-compact hook** (PreCompact): before Claude Code compacts a conversation, the session transcript is mined so nothing is lost. Only user and assistant text is stored, not tool calls, tool output or thinking, and running it again on the same session adds no duplicates.
-
-```bash
-engram install-hooks   # copies the scripts to ~/.engram/hooks/ and prints the settings snippet
-```
-
-Merge the printed snippet into `~/.claude/settings.json`. It looks like:
-
-```json
-{
-  "hooks": {
-    "PostToolUse": [{
-      "matcher": "Write|Edit|MultiEdit",
-      "hooks": [{"type": "command", "command": "~/.engram/hooks/engram_save_hook.sh"}]
-    }],
-    "PreCompact": [{
-      "hooks": [{"type": "command", "command": "~/.engram/hooks/engram_precompact_hook.sh"}]
-    }]
-  }
-}
-```
-
-Optional environment variables: `ENGRAM_WING` (default `default`), `ENGRAM_ROOM` for transcripts (default `conversation`), `ENGRAM_AGENT` for diary entries (default `claude-code`).
-
----
-
-## Web UI (notes)
-
-```bash
-engram ui          # opens http://127.0.0.1:7741 in your browser
-```
 <img width="1126" height="932" alt="Engram notes UI with knowledge graph" src="https://github.com/user-attachments/assets/870d76e7-bdc3-42a5-9056-6a54a1dd7ef1" />
 
-A local notes app with a force-directed graph of your notes and their `[[wikilinks]]`: wing tabs, `#tag` filters, pinned notes, a daily journal, a Markdown editor, and JSON export/import.
+### Code map
 
-> **Note:** the UI keeps its notes in your browser's local storage. It does not yet show the memories Engram stores in `~/.engram/` (mined files, conversations, MCP memories). Use `engram search`, `engram replay` or the MCP tools for those.
+| File | What it does |
+|---|---|
+| `engram/chateau.py` | Wings, rooms, halls and drawers on disk |
+| `engram/searcher.py` | Search: meaning, keywords, time, recency, reranking |
+| `engram/indexing.py` | Splits long text into chunks for the index |
+| `engram/temporal.py` | Understands "two weeks ago", "last month" |
+| `engram/preferences.py` | Spots preferences and concerns in messages |
+| `engram/reranker.py` | Optional local reranker (ONNX) |
+| `engram/miner.py`, `engram/convo_miner.py` | Saving files and conversations |
+| `engram/mcp_server.py` | MCP server (22 tools) |
+| `engram/layers.py`, `engram/shorthand.py` | Wake-up context and ES shorthand |
+| `engram/knowledge_graph.py`, `engram/agents.py` | Knowledge graph and agent diaries |
+| `engram/backends/` | ChromaDB (default), FAISS, sqlite-vec |
+| `engram/plugins/` | Obsidian, Notion, Linear importers |
+| `engram/hooks/` | Claude Code save and pre-compact hooks |
+| `benchmarks/` | LongMemEval and LoCoMo runners |
+</details>
 
 ---
 
 ## Requirements
 
-- Python 3.9+
-- chromadb ≥ 1.0 on Python 3.9–3.14, installed automatically. On Python 3.15+ (no onnxruntime build yet) Engram installs without it and uses the built-in sqlitevec backend; use Python 3.11–3.14 for semantic search.
-- typer ≥ 0.9.0
-- rich ≥ 13.0.0
-- watchdog ≥ 3.0.0
-- questionary ≥ 2.0.0
-- pyyaml ≥ 6.0
+- **Python 3.9 or newer.** Python 3.11–3.14 is recommended for meaning-based search.
+- **Installed automatically:** ChromaDB, typer, rich, watchdog, questionary, pyyaml and requests.
+- **Optional extras:** `engram-chateau[faiss]`, `[sqlitevec]`, `[viz]` (graph pictures) or `[all]`.
+- **Optional services:** [Ollama](https://ollama.com) for `engram answer`.
 
-Optional:
-- `faiss-cpu` — FAISS backend
-- `sqlite-vec` — sqlite-vec backend
-- `matplotlib` + `networkx` — graph visualisation (`pip install "engram-chateau[viz]"`)
-- `requests` — Ollama API calls for `engram answer`
-
-No API key. No internet after install.
+No API key. After install, nothing needs the internet. The only exception is `engram setup-reranker`, which downloads its model once, when you choose to run it.
 
 ---
 
 ## Contributing
 
-1. Fork the repo
+1. Fork the repo.
 2. `pip install -e ".[dev]"`
-3. `pre-commit install`
-4. Run tests: `pytest tests/ -v`
-5. Submit a PR
+3. `pytest`
+4. Open a pull request.
 
-### Releasing
+<details>
+<summary><b>Releasing (maintainers)</b></summary>
 
-Engram is published to PyPI as **`engram-chateau`** (the command and `import engram` are unchanged). Publishing runs from `.github/workflows/publish.yml` using PyPI trusted publishing, so no API token is stored anywhere.
+Engram is published to PyPI as `engram-chateau` from `.github/workflows/publish.yml`, using PyPI trusted publishing (no stored token; owner `TushaeBXN`, repository `engram`, workflow `publish.yml`, environment `pypi`).
 
-The trusted publisher is configured on pypi.org for project `engram-chateau`: owner `TushaeBXN`, repository `engram`, workflow `publish.yml`, environment `pypi`.
-
-To release: bump `version` in `pyproject.toml` and `__version__` in `engram/__init__.py`, merge, then publish a GitHub release tagged `v<version>` with the dots kept (for example `v1.3.0`, not `v1.30`). The workflow checks the tag matches both, runs the tests, builds, and uploads.
+1. Bump `version` in `pyproject.toml` and `__version__` in `engram/__init__.py`, and add a `CHANGELOG.md` entry.
+2. Merge to `main`.
+3. Create a **new** GitHub release *after* the merge, tagged `v<version>` with the dots kept (for example `v1.4.0`, not `v1.40`), targeting `main`. The workflow checks the tag matches the version, runs the tests, builds and uploads.
+</details>
 
 ---
 
-## License
+## Credits and license
+
+Engram's design (wings, rooms, halls, drawers and a temporal knowledge graph) is inspired by [MemPalace](https://github.com/MemPalace/mempalace).
 
 MIT © 2026 Tushae Thomas
