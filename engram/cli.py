@@ -184,16 +184,26 @@ def cmd_search(
         console.print("[yellow]No results found.[/yellow]")
         return
 
-    table = Table(title=f"Search: '{query}'", show_header=True, header_style="bold cyan")
+    import math
+
+    # When the reranker ordered the results, show its score (as a 0-1 relevance)
+    # so the column agrees with the order.
+    reranked = any("rerank_score" in r for r in results)
+    table = Table(title=f"Search: '{query}'" + (" (reranked)" if reranked else ""),
+                  show_header=True, header_style="bold cyan")
     table.add_column("#", style="dim", width=3)
-    table.add_column("Score", width=7)
+    table.add_column("Relevance" if reranked else "Score", width=9 if reranked else 7)
     table.add_column("Wing/Room/Hall", width=28)
     table.add_column("Content", overflow="fold")
 
     for i, r in enumerate(results, 1):
         meta = r.get("metadata", {})
         loc = f"{meta.get('wing','?')}/{meta.get('room','?')}/{meta.get('hall','?')}"
-        score_str = f"{r['final_score']:.3f}"
+        if reranked:
+            rs = r.get("rerank_score")
+            score_str = f"{1 / (1 + math.exp(-rs)):.3f}" if rs is not None else "—"
+        else:
+            score_str = f"{r['final_score']:.3f}"
         pin = " 📌" if r.get("pinned") else ""
         table.add_row(str(i), score_str, loc + pin, r["text"][:120])
 

@@ -196,3 +196,14 @@ def test_setup_reranker_reports_failure(engram_home, monkeypatch):
     monkeypatch.setattr(rr, "ensure_model", fail)
     result = CliRunner().invoke(app, ["setup-reranker"])
     assert result.exit_code == 1 and "offline" in result.output
+
+
+def test_cli_shows_rerank_relevance_in_result_order(engram_home, tmp_path, monkeypatch):
+    import engram.cli as cli
+    s = searcher(tmp_path, reranker=True, reranker_path=str(TINY))
+    monkeypatch.setattr(cli, "_searcher", lambda *a, **k: s)
+    out = CliRunner(env={"COLUMNS": "200"}).invoke(app, ["search", QUERY]).output
+    assert "(reranked)" in out and "Relevance" in out
+    assert "0.881" in out  # sigmoid(2.0) for the jazz memory, listed first
+    out = CliRunner(env={"COLUMNS": "200"}).invoke(app, ["search", QUERY, "--no-rerank"]).output
+    assert "(reranked)" not in out and "Score" in out
