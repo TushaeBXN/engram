@@ -91,7 +91,8 @@ def _make_backend(backend_name: str, workdir: Path, shared_dir: Optional[Path], 
 
 def run_locomo(data_file: Path, limit: Optional[int] = None, backend: str = "chromadb",
                top_k: int = 10, hybrid_weight: float = 0.0, temporal_weight: float = 0.0,
-               preferences: bool = False, out: Optional[Path] = None) -> dict:
+               preferences: bool = False, out: Optional[Path] = None,
+               rerank: bool = False, rerank_top: int = 20) -> dict:
     """Session recall@k on LoCoMo for every question in the first *limit* conversations."""
     from engram.chateau import Chateau
     from engram.convo_miner import ConvoMiner
@@ -117,7 +118,8 @@ def run_locomo(data_file: Path, limit: Optional[int] = None, backend: str = "chr
                 workdir = Path(tmp)
                 be = _make_backend(backend, workdir, Path(shared.name) if shared else None, n)
                 palace = Chateau(chateau_path=workdir / "chateau")
-                cfg = {"decay_factor": 0.0, "decay_max_days": 0, "preference_summaries": preferences}
+                cfg = {"decay_factor": 0.0, "decay_max_days": 0, "preference_summaries": preferences,
+                       "rerank_top": rerank_top}
                 miner = ConvoMiner(palace, be, cfg)
                 for sess_id, date, turns in sessions:
                     # Both people are users of the memory; speaker names stay in the text,
@@ -135,7 +137,7 @@ def run_locomo(data_file: Path, limit: Optional[int] = None, backend: str = "chr
                 for qa in sample["qa"]:
                     hits = searcher.search(qa["question"], n=50, no_decay=True,
                                            hybrid_weight=hybrid_weight,
-                                           temporal_weight=temporal_weight, now=now)
+                                           temporal_weight=temporal_weight, now=now, rerank=rerank)
                     ranked: list = []
                     for hit in hits:
                         sid = hit["metadata"].get("room")
@@ -171,6 +173,7 @@ def run_locomo(data_file: Path, limit: Optional[int] = None, backend: str = "chr
         "hybrid_weight": hybrid_weight,
         "temporal_weight": temporal_weight,
         "preferences": preferences,
+        "rerank": rerank,
         "seconds": round(time.time() - t0, 1),
         f"recall@{top_k}": round(statistics.mean(scores), 4) if scores else None,
         "recall@5": round(statistics.mean(recall5), 4) if recall5 else None,
@@ -192,6 +195,8 @@ def main() -> None:
     parser.add_argument("--hybrid", action="store_true", help="Keyword boost (hybrid_weight 0.3)")
     parser.add_argument("--temporal", action="store_true", help="Time boost (temporal_weight 0.4)")
     parser.add_argument("--preferences", action="store_true", help="Index preference summaries")
+    parser.add_argument("--rerank", action="store_true", help="Reorder top results with the local reranker")
+    parser.add_argument("--rerank-top", type=int, default=20, help="Results the reranker reorders")
     parser.add_argument("--out", type=Path, help="Write per-question results as JSONL")
     args = parser.parse_args()
 
@@ -203,7 +208,8 @@ def main() -> None:
     results = run_locomo(args.data_dir or args.data_file, limit=args.limit, backend=args.backend,
                          top_k=args.top_k, hybrid_weight=0.3 if args.hybrid else 0.0,
                          temporal_weight=0.4 if args.temporal else 0.0,
-                         preferences=args.preferences, out=args.out)
+                         preferences=args.preferences, out=args.out,
+                         rerank=args.rerank, rerank_top=args.rerank_top)
     print(json.dumps(results, indent=2))
 
 

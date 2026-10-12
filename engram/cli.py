@@ -170,11 +170,15 @@ def cmd_search(
         None, "--hybrid/--no-hybrid",
         help="Boost results that share the query's keywords (default: on, from config)."),
     hybrid_weight: float = typer.Option(0.3, "--hybrid-weight", help="Keyword boost weight used with --hybrid."),
+    rerank: Optional[bool] = typer.Option(
+        None, "--rerank/--no-rerank",
+        help="Reorder top results with the local reranker model (default: from config, off)."),
 ):
     """Semantic search across the château."""
     searcher = _searcher()
     results = searcher.search(query, n=n, wing=wing, room=room, no_decay=no_decay,
-                              hybrid_weight=None if hybrid is None else (hybrid_weight if hybrid else 0.0))
+                              hybrid_weight=None if hybrid is None else (hybrid_weight if hybrid else 0.0),
+                              rerank=rerank)
 
     if not results:
         console.print("[yellow]No results found.[/yellow]")

@@ -161,6 +161,8 @@ curl -fsSL -o ~/datasets/locomo/locomo10.json \
 python benchmarks/locomo_bench.py ~/datasets/locomo/locomo10.json                # semantic
 python benchmarks/locomo_bench.py ~/datasets/locomo/locomo10.json \
   --hybrid --temporal --preferences --out locomo_default.jsonl                   # Engram's default
+python benchmarks/locomo_bench.py ~/datasets/locomo/locomo10.json \
+  --hybrid --temporal --preferences --rerank --out locomo_rerank.jsonl           # plus the local reranker
 
 # ES compression ratio
 python benchmarks/longmemeval_bench.py --compression-only

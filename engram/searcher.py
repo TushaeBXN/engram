@@ -68,6 +68,7 @@ class Searcher:
         hybrid_weight: Optional[float] = None,
         temporal_weight: Optional[float] = None,
         now: Optional[datetime] = None,
+        rerank: Optional[bool] = None,
     ) -> list[dict]:
         """Semantic search with optional recency weighting.
 
@@ -84,6 +85,9 @@ class Searcher:
                       ("two weeks ago", "last month"); None uses the config's
                       ``temporal_weight``.
             now:      Reference time for those phrases (default: the current time).
+            rerank:   Reorder the top results with the local cross-encoder
+                      (engram.reranker); None uses the config's ``reranker``
+                      (off by default).
 
         Returns:
             List of result dicts sorted by final_score descending::
@@ -152,7 +156,17 @@ class Searcher:
         best: dict[str, dict] = {}
         for hit in scored:
             best.setdefault(hit["id"], hit)
-        return list(best.values())[:n]
+        results = list(best.values())
+        if rerank is None:
+            rerank = bool(self.config.get("reranker", False))
+        if rerank:
+            from engram.reranker import get_reranker
+            from engram.reranker import rerank as rerank_results
+            model = get_reranker(self.config)
+            if model is not None:
+                results = rerank_results(query, results, model,
+                                         top=int(self.config.get("rerank_top", 20)))
+        return results[:n]
 
     def get_by_id(self, drawer_id: str) -> Optional[Drawer]:
         """Fetch a drawer by ID from the palace."""
