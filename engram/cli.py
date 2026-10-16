@@ -979,8 +979,19 @@ def cmd_install_hooks(
     dest: Path = typer.Option(
         Path("~/.engram/hooks"), "--dest", help="Directory to copy the hook scripts into."
     ),
+    apply: bool = typer.Option(
+        False, "--apply", help="Add the hooks to ~/.claude/settings.json yourself (a backup is kept)."
+    ),
+    settings_path: Path = typer.Option(
+        Path("~/.claude/settings.json"), "--settings", help="Claude Code settings file to update with --apply."
+    ),
+    no_recall: bool = typer.Option(False, "--no-recall", help="Leave out auto-recall."),
 ):
-    """Copy the Claude Code hook scripts and print the settings.json snippet to add."""
+    """Install the Claude Code hooks: auto-save, pre-compact save, and auto-recall.
+
+    Auto-recall searches Engram each time you send Claude a message and adds up
+    to a few clearly relevant memories to its context.
+    """
     import json
     import shutil
 
@@ -994,20 +1005,94 @@ def cmd_install_hooks(
         out.chmod(0o755)
         installed[script] = str(out)
 
-    snippet = {
-        "hooks": {
-            "PostToolUse": [{
-                "matcher": "Write|Edit|MultiEdit",
-                "hooks": [{"type": "command", "command": installed["engram_save_hook.sh"]}],
-            }],
-            "PreCompact": [{
-                "hooks": [{"type": "command", "command": installed["engram_precompact_hook.sh"]}],
-            }],
-        }
-    }
+    snippet = hook_settings(installed, recall_command=None if no_recall else recall_command())
     console.print(f"[green]✓[/green] Hooks copied to {target}")
-    console.print("Add this to [bold]~/.claude/settings.json[/bold] (merge with any existing hooks):")
-    print(json.dumps(snippet, indent=2))
+    if not apply:
+        console.print("Add this to [bold]~/.claude/settings.json[/bold] (merge with any existing hooks), "
+                      "or run again with [bold]--apply[/bold] to do it for you:")
+        print(json.dumps(snippet, indent=2))
+        return
+    path = settings_path.expanduser()
+    try:
+        added = merge_hook_settings(path, snippet)
+    except ValueError as exc:
+        console.print(f"[red]Error:[/red] {exc}", markup=False)
+        raise typer.Exit(1)
+    if added:
+        console.print(f"[green]✓[/green] Added {added} hook(s) to {path} (previous version saved as "
+                      f"{path.name}.bak). Restart Claude Code to load them.")
+    else:
+        console.print(f"[green]✓[/green] {path} already has the Engram hooks; nothing changed.")
+    if not no_recall:
+        console.print("Auto-recall is on. Preview what it would add with [bold]engram recall \"a message\"[/bold]; "
+                      "turn it off with [bold]\"recall\": false[/bold] in ~/.engram/config.json.")
+
+
+def recall_command() -> str:
+    """The auto-recall hook command: this Python, so the hook finds Engram whatever PATH is."""
+    import shlex
+    import sys
+    return f"{shlex.quote(sys.executable)} -m engram.recall"
+
+
+def hook_settings(installed: dict, recall_command: Optional[str]) -> dict:
+    hooks = {
+        "PostToolUse": [{
+            "matcher": "Write|Edit|MultiEdit",
+            "hooks": [{"type": "command", "command": installed["engram_save_hook.sh"]}],
+        }],
+        "PreCompact": [{
+            "hooks": [{"type": "command", "command": installed["engram_precompact_hook.sh"]}],
+        }],
+    }
+    if recall_command:
+        hooks["UserPromptSubmit"] = [{"hooks": [{"type": "command", "command": recall_command,
+                                                 "timeout": 30}]}]
+    return {"hooks": hooks}
+
+
+def merge_hook_settings(path: Path, snippet: dict) -> int:
+    """Add *snippet*'s hooks to the settings file at *path*, skipping ones already there.
+
+    Keeps a ``.bak`` copy and returns how many hook entries were added. Raises
+    ValueError if the existing file isn't valid JSON (it is then left untouched).
+    """
+    import json
+    import shutil
+
+    settings = {}
+    if path.exists():
+        try:
+            settings = json.loads(path.read_text() or "{}")
+        except ValueError as exc:
+            raise ValueError(f"{path} is not valid JSON ({exc}); fix it or add the hooks by hand") from exc
+    hooks = settings.setdefault("hooks", {})
+    existing = {h.get("command") for groups in hooks.values() if isinstance(groups, list)
+                for g in groups if isinstance(g, dict) for h in g.get("hooks", []) if isinstance(h, dict)}
+    added = 0
+    for event, groups in snippet["hooks"].items():
+        for group in groups:
+            if all(h["command"] in existing for h in group["hooks"]):
+                continue
+            hooks.setdefault(event, []).append(group)
+            added += 1
+    if added:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists():
+            shutil.copyfile(path, path.with_name(path.name + ".bak"))
+        path.write_text(json.dumps(settings, indent=2) + "\n")
+    return added
+
+
+@app.command("recall")
+def cmd_recall(message: str = typer.Argument(..., help="A message you might send Claude.")):
+    """Preview what auto-recall would add to Claude's context for MESSAGE."""
+    from engram.recall import recall
+    note = recall(message, remember=False)
+    if note:
+        print(note)
+    else:
+        console.print("[dim]Nothing relevant enough; Claude would get no extra context for this message.[/dim]")
 
 
 @app.command("setup-reranker")

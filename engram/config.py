@@ -27,6 +27,14 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # Full-text keyword index (SQLite FTS5, BM25) searched alongside the
     # embeddings, merged by reciprocal rank fusion (engram.keyword_index).
     "keyword_search": True,
+    # Auto-recall for Claude Code (engram.recall, `engram install-hooks`): how
+    # many memories at most, how relevant they must be (meaning similarity
+    # 0..1), wings never shown, and whether to rerank (slower).
+    "recall": True,
+    "recall_max": 3,
+    "recall_min_relevance": 0.35,
+    "recall_exclude_wings": ["library"],
+    "recall_rerank": False,
     # Optional local cross-encoder that reorders the top results
     # (engram.reranker). Off by default; turning it on downloads a ~90 MB
     # model once to ~/.engram/models/.

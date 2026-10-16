@@ -92,7 +92,19 @@ claude mcp add engram -- engram-mcp
 
 Claude now has 26 `engram_*` tools: search, remember, correct an outdated memory, recall a topic's history, a knowledge graph of people and facts, and more. Ask *"remember that we use tabs in this repo"*, *"what did we decide about auth?"* or *"we moved to PostgreSQL, update that"*.
 
-**Optional: auto-save your Claude Code work.** Run `engram install-hooks` and paste the snippet it prints into `~/.claude/settings.json`. From then on, every file Claude edits is saved, and every conversation is saved before Claude Code compacts it.
+**Recommended: let Claude remember on its own.**
+
+```bash
+engram install-hooks --apply      # then restart Claude Code
+```
+
+This adds three Claude Code hooks to `~/.claude/settings.json` (your existing settings are kept, with a backup):
+
+- **Auto-recall.** Each time you send Claude a message, Engram searches your memory first. If something clearly relevant turns up, Claude gets a short note with up to 3 memories before it answers, current versions first and outdated ones labelled. You ask *"why did we drop Passport?"* in a brand-new chat, and Claude already knows. Nothing is added when nothing is relevant, a memory isn't repeated within a session, and it takes about a second.
+- **Auto-save.** Every file Claude edits is saved.
+- **Save before compacting.** The conversation is saved before Claude Code compacts it.
+
+Preview what auto-recall would hand Claude with `engram recall "your message"`. Run `engram install-hooks` without `--apply` to see the settings instead of applying them, or add `--no-recall` to skip auto-recall.
 
 **Claude Desktop:** add this to `claude_desktop_config.json` (macOS: `~/Library/Application Support/Claude/`, Windows: `%APPDATA%\Claude\`) and restart the app:
 
@@ -291,7 +303,8 @@ The ID is the short code in the first column of `engram search` results.
 ### Setup
 ```bash
 engram init <dir>                              # guided setup
-engram install-hooks                           # Claude Code auto-save hooks
+engram install-hooks --apply                   # Claude Code hooks: auto-recall, auto-save, save before compacting
+engram recall "a message"                      # preview what auto-recall would give Claude
 engram setup-reranker                          # download the reranker model (90 MB) and turn it on
 engram setup-reranker --disable                # turn the reranker off
 ```
@@ -361,6 +374,9 @@ Everything works out of the box. If you want to tweak things, settings live in `
 |---|---|---|
 | `redact_secrets` | `false` | Blank out API keys, tokens and passwords (`[REDACTED:…]`) before anything is saved |
 | `reranker` | `false` | Local reranker; turn on with `engram setup-reranker`. While off, nothing extra is downloaded |
+| `recall` | `true` | Auto-recall in Claude Code (needs `engram install-hooks`); `false` turns it off |
+| `recall_max` / `recall_min_relevance` | `3` / `0.35` | At most this many memories per message, and how closely they must match (0 to 1) |
+| `recall_exclude_wings` | `["library"]` | Wings auto-recall never shows |
 | `keyword_search` | `true` | Exact-word index searched alongside meaning (SQLite, no download), built from your existing memories the first time it runs |
 | `vector_backend` | `chromadb` | Search engine: `chromadb`, `faiss` or `sqlitevec` (no compiled parts) |
 | `hybrid_weight` | `0.3` | Boost for results sharing your exact words; `0` turns it off |
@@ -430,6 +446,7 @@ compress("The authentication module is a critical component that has a dependenc
 | `engram/miner.py`, `engram/convo_miner.py` | Saving files and conversations |
 | `engram/lineage.py` | Corrections: which memories are current, which were replaced, and why |
 | `engram/backup.py` | `engram export` / `engram import` |
+| `engram/recall.py` | Auto-recall hook for Claude Code |
 | `engram/mcp_server.py` | MCP server (26 tools), run as `engram-mcp` |
 | `engram/layers.py`, `engram/shorthand.py` | Wake-up note and ES shorthand |
 | `engram/knowledge_graph.py`, `engram/agents.py` | Knowledge graph and agent diaries |
