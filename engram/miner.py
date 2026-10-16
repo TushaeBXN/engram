@@ -185,7 +185,7 @@ class Miner:
         index_drawer(
             self.backend,
             drawer.id,
-            content,
+            drawer.content,
             {
                 "wing": wing,
                 "room": room,

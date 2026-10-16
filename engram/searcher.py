@@ -69,6 +69,7 @@ class Searcher:
         temporal_weight: Optional[float] = None,
         now: Optional[datetime] = None,
         rerank: Optional[bool] = None,
+        keyword_search: Optional[bool] = None,
     ) -> list[dict]:
         """Semantic search with optional recency weighting.
 
@@ -85,6 +86,10 @@ class Searcher:
                       ("two weeks ago", "last month"); None uses the config's
                       ``temporal_weight``.
             now:      Reference time for those phrases (default: the current time).
+            keyword_search: Also run the full-text keyword index and merge
+                      both rankings (reciprocal rank fusion). Needs a backend
+                      from ``backend_from_config`` with ``keyword_search`` on;
+                      None uses the config (off by default).
             rerank:   Reorder the top results with the local cross-encoder
                       (engram.reranker); None uses the config's ``reranker``
                       (off by default).
@@ -115,8 +120,8 @@ class Searcher:
         query_kw = keywords(query) if hybrid_weight else set()
         if temporal_weight is None:
             temporal_weight = float(self.config.get("temporal_weight", 0.0))
-        time_ref = time_reference(query) if temporal_weight else None
         now = now or datetime.now(timezone.utc)
+        time_ref = time_reference(query, now) if temporal_weight else None
 
         scored = []
         for hit in raw:
@@ -157,6 +162,11 @@ class Searcher:
         for hit in scored:
             best.setdefault(hit["id"], hit)
         results = list(best.values())
+        if keyword_search is None:
+            keyword_search = bool(self.config.get("keyword_search", False))
+        if keyword_search and hasattr(self.backend, "keyword_search"):
+            kw_hits = self.backend.keyword_search(query, n=n * 5, where=where or None)
+            results = fuse_rankings(results, kw_hits)
         if rerank is None:
             rerank = bool(self.config.get("reranker", False))
         if rerank:
@@ -177,6 +187,41 @@ class Searcher:
 
 
 # ---------------------------------------------------------------------------
+
+RRF_K = 60  # the usual reciprocal-rank-fusion constant
+
+
+def fuse_rankings(results: list[dict], keyword_hits: list[dict], k: int = RRF_K) -> list[dict]:
+    """Merge the meaning-search ranking with the keyword-index ranking.
+
+    Each drawer scores ``1 / (k + rank)`` in every list it appears in, and the
+    sum decides the order (reciprocal rank fusion). Drawers only the keyword
+    index found are added with zero semantic scores. Each result gains a
+    ``fusion_score``.
+    """
+    by_id = {r["id"]: r for r in results}
+    fused = {rid: 1.0 / (k + i + 1) for i, rid in enumerate(by_id)}
+    order: list[str] = []
+    for hit in keyword_hits:
+        did = drawer_id_of(hit)
+        if did in order:
+            continue
+        order.append(did)
+        if did not in by_id:
+            meta = hit.get("metadata") or {}
+            by_id[did] = {
+                "id": did, "text": hit["text"], "metadata": meta,
+                "semantic_score": 0.0, "recency_boost": 0.0, "keyword_overlap": 0.0,
+                "temporal_closeness": 0.0, "final_score": 0.0,
+                "pinned": bool(meta.get("pinned", False)),
+            }
+    for i, did in enumerate(order):
+        fused[did] = fused.get(did, 0.0) + 1.0 / (k + i + 1)
+    out = sorted(by_id.values(), key=lambda r: fused[r["id"]], reverse=True)
+    for r in out:
+        r["fusion_score"] = round(fused[r["id"]], 6)
+    return out
+
 
 def _build_where(
     wing: Optional[str], room: Optional[str], hall: Optional[str]

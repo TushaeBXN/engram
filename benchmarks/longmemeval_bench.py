@@ -123,7 +123,8 @@ def _lme_date(value: str):
 
 def rank_sessions(entry: dict, workdir: Path, backend_name: str, roles: str,
                   hybrid_weight: float = 0.0, backend=None, temporal_weight: float = 0.0,
-                  preferences: bool = False, rerank: bool = False) -> list[str]:
+                  preferences: bool = False, rerank: bool = False,
+                  keywords: bool = False) -> list[str]:
     """Mine one question's haystack with Engram's pipeline and rank its sessions.
 
     Each haystack session becomes a room; every message goes through
@@ -149,6 +150,9 @@ def rank_sessions(entry: dict, workdir: Path, backend_name: str, roles: str,
         backend = get_backend("sqlitevec", db_path=workdir / "vec.db")
     elif backend is None:
         backend = get_backend(backend_name)
+    if keywords:
+        from engram.keyword_index import KeywordIndex, KeywordIndexedBackend
+        backend = KeywordIndexedBackend(backend, KeywordIndex(workdir / "keywords.db"))
     cfg = {"decay_factor": 0.0, "decay_max_days": 0, "preference_summaries": preferences,
            "rerank_top": RERANK_TOP}
     miner = ConvoMiner(palace, backend, cfg)
@@ -167,7 +171,7 @@ def rank_sessions(entry: dict, workdir: Path, backend_name: str, roles: str,
     hits = Searcher(backend, palace, cfg).search(
         entry["question"], n=50, no_decay=True, hybrid_weight=hybrid_weight,
         temporal_weight=temporal_weight, now=_lme_date(entry.get("question_date", "")),
-        rerank=rerank)
+        rerank=rerank, keyword_search=keywords)
     ranked: list[str] = []
     for hit in hits:
         sid = hit["metadata"].get("room")
@@ -195,7 +199,7 @@ def run_longmemeval(data_file: Path, limit: int | None = None, backend: str = "c
                     roles: str = "all", out: Path | None = None,
                     hybrid_weight: float = 0.0, resume: bool = False,
                     temporal_weight: float = 0.0, preferences: bool = False,
-                    rerank: bool = False) -> dict:
+                    rerank: bool = False, keywords: bool = False) -> dict:
     """Session-level retrieval recall on LongMemEval (same metric as MemPalace's "raw" R@k).
 
     For each question a fresh château and index are built from its haystack
@@ -251,7 +255,7 @@ def run_longmemeval(data_file: Path, limit: int | None = None, backend: str = "c
                                      collection_name=f"bench-{i}")
             with tempfile.TemporaryDirectory() as tmp:
                 ranked = rank_sessions(entry, Path(tmp), backend, roles, hybrid_weight, shared,
-                                       temporal_weight, preferences, rerank)
+                                       temporal_weight, preferences, rerank, keywords)
             if shared:
                 shared.drop()
             scores = {f"recall_any@{k}": float(bool(gold & set(ranked[:k]))) for k in RECALL_KS}
@@ -282,6 +286,7 @@ def run_longmemeval(data_file: Path, limit: int | None = None, backend: str = "c
         "temporal_weight": temporal_weight,
         "preferences": preferences,
         "rerank": rerank,
+        "keywords": keywords,
         "seconds": round(time.time() - t0, 1),
         **{name: round(statistics.mean(v), 4) for name, v in totals.items()},
         "by_type": {
@@ -313,6 +318,8 @@ def main() -> None:
                         help="Index a preference summary with each user message")
     parser.add_argument("--rerank", action="store_true",
                         help="Reorder the top results with Engram's local reranker model")
+    parser.add_argument("--keywords", action="store_true",
+                        help="Also search the full-text keyword index and merge the rankings")
     parser.add_argument("--rerank-top", type=int, default=20,
                         help="How many top results the reranker reorders (default 20)")
     parser.add_argument("--resume", action="store_true",
@@ -346,7 +353,8 @@ def main() -> None:
                                   hybrid_weight=args.hybrid_weight if args.hybrid else 0.0,
                                   resume=args.resume,
                                   temporal_weight=args.temporal_weight if args.temporal else 0.0,
-                                  preferences=args.preferences, rerank=args.rerank)
+                                  preferences=args.preferences, rerank=args.rerank,
+                                  keywords=args.keywords)
     print("  " + json.dumps(lme_results, indent=2))
 
 

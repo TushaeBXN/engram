@@ -72,4 +72,14 @@ def get_backend(name: str = "chromadb", fallback: bool = False, **kwargs) -> Vec
     raise ValueError(f"Unknown vector backend '{name}'. Choose: chromadb | faiss | sqlitevec")
 
 
-__all__ = ["BackendUnavailableError", "VectorBackend", "get_backend"]
+def backend_from_config(cfg: dict, fallback: bool = True) -> VectorBackend:
+    """The backend Engram's CLI, MCP server and watcher use: the configured
+    vector backend, plus the keyword index when ``keyword_search`` is on."""
+    backend = get_backend(cfg.get("vector_backend", "chromadb"), fallback=fallback)
+    if cfg.get("keyword_search"):
+        from engram.keyword_index import with_keyword_index
+        backend = with_keyword_index(backend, cfg)
+    return backend
+
+
+__all__ = ["BackendUnavailableError", "VectorBackend", "backend_from_config", "get_backend"]

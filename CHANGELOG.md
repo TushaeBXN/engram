@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased
+
+Ideas adapted from [Hindsight](https://github.com/vectorize-io/hindsight),
+kept local and LLM-free.
+
+**Dates in questions.** "What happened in June?", "on May 8", "8 May 2023",
+"in 2022" now steer the time boost the way "two weeks ago" already did
+(`engram.temporal`). On by default as part of `temporal_weight`. LoCoMo R@10
+rises from 0.874 to 0.901 with no other change.
+
+**Keyword index (opt-in).** `"keyword_search": true` adds a full-text index
+(SQLite FTS5 with BM25, part of Python; no download) next to the vector
+index, kept in sync on every write and built from existing memories on first
+use. Search runs both and merges them with reciprocal rank fusion. LoCoMo
+R@10 0.921 and R@5 0.849 (MemPalace hybrid v5: 0.889 / 0.837). Off until it
+is measured on LongMemEval too. Both benchmark runners gained `--keywords`.
+
+**Secret redaction (opt-in).** `"redact_secrets": true` replaces API keys,
+tokens, private keys and `password=`-style values with `[REDACTED:<kind>]`
+before a drawer is saved or indexed (`engram.redact`).
+
+Internals: `backend_from_config()` builds the CLI/MCP/watcher backend in one
+place; the MCP server, file miner and plugin import now index the saved
+drawer text.
+
 ## 1.4.0
 
 **98.8% R@5 on LongMemEval and 88.7% R@10 on LoCoMo with the optional local

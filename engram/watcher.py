@@ -57,13 +57,13 @@ class EngramWatcher:
         from watchdog.events import FileSystemEventHandler  # type: ignore
         from watchdog.observers import Observer  # type: ignore
 
-        from engram.backends import get_backend
+        from engram.backends import backend_from_config
         from engram.chateau import Chateau
         from engram.miner import Miner
 
         console = Console()
         palace = Chateau(self._chateau_path)
-        backend = get_backend(self.config.get("vector_backend", "chromadb"), fallback=True)
+        backend = backend_from_config(self.config)
         miner = Miner(palace, backend, self.config)
 
         watcher = self

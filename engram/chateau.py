@@ -215,9 +215,15 @@ class Chateau:
             tunnels.json           ← cross-wing tunnel records
     """
 
-    def __init__(self, chateau_path: Optional[Path] = None) -> None:
+    def __init__(self, chateau_path: Optional[Path] = None, redact: Optional[bool] = None) -> None:
         self.path: Path = (chateau_path or get_chateau_path()).expanduser()
         self.path.mkdir(parents=True, exist_ok=True)
+        # Secret redaction before saving (engram.redact). None: follow the
+        # "redact_secrets" config key for the default château, off otherwise.
+        if redact is None and chateau_path is None:
+            from engram.config import load_config
+            redact = bool(load_config().get("redact_secrets", False))
+        self.redact = bool(redact)
 
     # ------------------------------------------------------------------
     # Wing operations
@@ -309,7 +315,14 @@ class Chateau:
         return self.hall_path(wing, room, hall) / f"{validate_name(drawer_id, 'drawer id')}.json"
 
     def save_drawer(self, drawer: Drawer) -> Path:
-        """Persist a drawer to disk.  Creates wing/room/hall if needed."""
+        """Persist a drawer to disk.  Creates wing/room/hall if needed.
+
+        With redaction on, secrets in ``drawer.content`` are replaced first
+        (in place, so whatever indexes the drawer next sees the same text).
+        """
+        if self.redact:
+            from engram.redact import redact_secrets
+            drawer.content = redact_secrets(drawer.content)
         self.ensure_room(drawer.wing, drawer.room)
         dest = self._drawer_file(drawer.wing, drawer.room, drawer.hall, drawer.id)
         dest.parent.mkdir(parents=True, exist_ok=True)

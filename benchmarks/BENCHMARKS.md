@@ -70,8 +70,8 @@ raw mode indexes user turns only, and one question is worth 0.002.
 
 ### LoCoMo (locomo10, 10 conversations, 1,986 questions)
 
-Engram 1.3.0, ChromaDB with all-MiniLM-L6-v2, no reranker, no LLM. Run on a
-Linux CPU machine in about 18 minutes per configuration. Each conversation
+ChromaDB with all-MiniLM-L6-v2, no LLM. Run on a Linux CPU machine in about
+18 minutes per configuration (the `--rerank` run on an Apple-silicon Mac mini). Each conversation
 is mined once (one room per session, one drawer per turn written as
 `Speaker said, "…"`) and all of its questions are asked against it. Metric:
 for each question, the share of its evidence sessions among the top-k
@@ -79,31 +79,38 @@ retrieved sessions, averaged over all questions in all five categories,
 exactly as MemPalace's `locomo_bench.py --granularity session` computes it
 (including its parsing of the evidence IDs).
 
-| Metric          | Semantic | **Default** (`--hybrid --temporal --preferences`) | Default + `--rerank` |
-|-----------------|----------|-----------|-----------|
-| **R@10**        | 0.844    | **0.874** | **0.887** |
-| R@5             | 0.727    | 0.783     | 0.828     |
-| Perfect (1.0)   | 1,595    | 1,658     | 1,691     |
-| Zero (0.0)      | 231      | 179       | 159       |
+| Metric          | Semantic | 1.4.0 default | 1.4.0 + `--rerank` | **Default** (adds dates) | **+ `--keywords`** |
+|-----------------|----------|---------------|--------------------|--------------------------|--------------------|
+| **R@10**        | 0.844    | 0.874         | 0.887              | **0.901**                | **0.921**          |
+| R@5             | 0.727    | 0.783         | 0.828              | 0.821                    | **0.849**          |
+| Perfect (1.0)   | 1,595    | 1,658         | 1,691              | 1,715                    | 1,758              |
+| Zero (0.0)      | 231      | 179           | 159                | 127                      | 91                 |
+
+"Default" is `--hybrid --temporal --preferences` with the current code, which
+also understands absolute dates in questions ("on 8 May 2023", "in June");
+252 of the 1,986 questions name one. `--keywords` adds the full-text keyword
+index (SQLite FTS5, BM25) merged with the meaning search by reciprocal rank
+fusion (k = 60), as Hindsight does. Neither was tuned on LoCoMo: the date
+windows and the fusion constant were set before these runs.
 
 By category (R@10), using MemPalace's category names:
 
-| Category           | n   | Semantic | Default | + rerank |
-|--------------------|-----|----------|---------|----------|
-| open-domain        | 841 | 0.893    | 0.928   | 0.936    |
-| adversarial        | 446 | 0.850    | 0.888   | 0.904    |
-| temporal           | 321 | 0.859    | 0.888   | 0.905    |
-| single-hop         | 282 | 0.717    | 0.734   | 0.761    |
-| temporal-inference | 96  | 0.718    | 0.701   | 0.683    |
+| Category           | n   | Semantic | 1.4.0 default | + rerank | Default | + keywords |
+|--------------------|-----|----------|---------------|----------|---------|------------|
+| open-domain        | 841 | 0.893    | 0.928         | 0.936    | 0.957   | 0.974      |
+| adversarial        | 446 | 0.850    | 0.888         | 0.904    | 0.915   | 0.957      |
+| temporal           | 321 | 0.859    | 0.888         | 0.905    | 0.929   | 0.929      |
+| single-hop         | 282 | 0.717    | 0.734         | 0.761    | 0.739   | 0.762      |
+| temporal-inference | 96  | 0.718    | 0.701         | 0.683    | 0.733   | 0.718      |
 
 The `--rerank` column uses the optional local reranker (ms-marco-MiniLM-L-6-v2,
 ONNX, reordering the top 20 results; `rerank_top` was set before the run). It
 ran on an Apple-silicon Mac mini in under 5 minutes for all 1,986 questions.
 It is off by default in Engram.
 
-The defaults were not changed or tuned for LoCoMo. They help four categories
-and cost temporal-inference about 1.6 points (questions that need facts from
-several sessions, where the time boost has little to anchor on).
+The 1.4.0 defaults helped four categories and cost temporal-inference about
+1.6 points; with dates understood, every category is above the semantic
+baseline.
 
 For reference, MemPalace reports R@10 0.603 for raw session retrieval and
 0.889 (R@5 0.837) for its hybrid v5, which adds person-name and
@@ -171,6 +178,8 @@ curl -fsSL -o ~/datasets/locomo/locomo10.json \
 python benchmarks/locomo_bench.py ~/datasets/locomo/locomo10.json                # semantic
 python benchmarks/locomo_bench.py ~/datasets/locomo/locomo10.json \
   --hybrid --temporal --preferences --out locomo_default.jsonl                   # Engram's default
+python benchmarks/locomo_bench.py ~/datasets/locomo/locomo10.json \
+  --hybrid --temporal --preferences --keywords --out locomo_kw.jsonl             # plus the keyword index
 python benchmarks/locomo_bench.py ~/datasets/locomo/locomo10.json \
   --hybrid --temporal --preferences --rerank --out locomo_rerank.jsonl           # plus the local reranker
 
