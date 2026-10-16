@@ -15,6 +15,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from engram.config import get_chateau_path, load_config
+from engram.lineage import short_id
 
 app = typer.Typer(
     name="engram",
@@ -193,6 +194,7 @@ def cmd_search(
                   show_header=True, header_style="bold cyan")
     table.add_column("#", style="dim", width=3)
     table.add_column("Relevance" if reranked else "Score", width=9 if reranked else 7)
+    table.add_column("ID", style="dim", width=13, no_wrap=True)
     table.add_column("Wing/Room/Hall", width=28)
     table.add_column("Content", overflow="fold")
 
@@ -209,9 +211,24 @@ def cmd_search(
         else:
             score_str = f"{r['final_score']:.3f}"
         pin = " 📌" if r.get("pinned") else ""
-        table.add_row(str(i), score_str, loc + pin, r["text"][:120])
+        table.add_row(str(i), score_str, short_id(r["id"]), loc + pin, _lineage_label(r) + r["text"][:120])
 
     console.print(table)
+    if any(r.get("status") == "superseded" for r in results):
+        console.print("[dim]Outdated memories are listed under what replaced them. "
+                      "`engram history <ID>` shows when and why.[/dim]")
+
+
+def _lineage_label(r: dict) -> str:
+    """A short, escaped prefix saying whether a search result is current."""
+    from rich.markup import escape
+    if r.get("status") == "superseded":
+        return escape(f"[outdated → {short_id(r.get('current_id') or r.get('superseded_by') or '')}] ")
+    if r.get("status") == "disputed":
+        return escape(f"[disputed with {', '.join(short_id(x) for x in r.get('disputed_with', []))}] ")
+    if r.get("supersedes"):
+        return escape(f"[current, replaces {', '.join(short_id(x) for x in r['supersedes'])}] ")
+    return ""
 
 
 # ---------------------------------------------------------------------------
@@ -447,6 +464,151 @@ def cmd_remember_type(
     if confidence < 0.5:
         console.print(f"[yellow]⚠  Low confidence ({confidence:.2f}) — consider reviewing this memory.[/yellow]")
 
+
+
+# ---------------------------------------------------------------------------
+# Corrections and history (engram.lineage)
+# ---------------------------------------------------------------------------
+
+def _lineage_call(fn, *args, **kwargs):
+    from engram.lineage import LineageError
+    try:
+        return fn(*args, **kwargs)
+    except LineageError as exc:
+        from rich.markup import escape
+        console.print(f"[red]Error:[/red] {escape(str(exc))}", highlight=False)
+        raise typer.Exit(1)
+
+
+@app.command("correct")
+def cmd_correct(
+    memory_id: str = typer.Argument(..., help="ID (or the first 8+ characters) of the outdated memory."),
+    content: str = typer.Argument(..., help="The corrected, current information."),
+    reason: str = typer.Option("", "--reason", help="Why it changed."),
+):
+    """Save a correction that replaces an outdated memory (the old one is kept as history)."""
+    from engram.lineage import correct_memory
+    palace = _palace()
+    out = _lineage_call(correct_memory, palace, _backend(), memory_id, content, reason=reason, by="cli")
+    if out["created"]:
+        console.print(f"[green]✓[/green] Saved {short_id(out['new']['id'])}, replacing {short_id(out['old']['id'])}.")
+    else:
+        console.print(f"Already corrected: {short_id(out['old']['id'])} → {short_id(out['new']['id'])} (nothing changed).")
+
+
+@app.command("supersede")
+def cmd_supersede(
+    old_id: str = typer.Argument(..., help="ID of the outdated memory."),
+    new_id: Optional[str] = typer.Argument(None, help="ID of the memory that replaces it."),
+    reason: str = typer.Option("", "--reason", help="Why it changed."),
+    undo: bool = typer.Option(False, "--undo", help="Make OLD_ID current again."),
+):
+    """Mark one stored memory as replacing another, or undo that with --undo."""
+    from engram.lineage import Lineage, supersede_memory
+    palace = _palace()
+    if undo:
+        drawer = _lineage_call(_find_or_fail, palace, old_id)
+        if Lineage(palace.path).restore(drawer.id):
+            console.print(f"[green]✓[/green] {short_id(drawer.id)} is current again.")
+        else:
+            console.print(f"{short_id(drawer.id)} was not replaced; nothing changed.")
+        return
+    if not new_id:
+        console.print("[red]Error:[/red] give the ID of the replacing memory, or use --undo.")
+        raise typer.Exit(1)
+    out = _lineage_call(supersede_memory, palace, old_id, new_id, reason=reason, by="cli")
+    verb = "now replaces" if out["created"] else "already replaced"
+    console.print(f"[green]✓[/green] {short_id(out['new']['id'])} {verb} {short_id(out['old']['id'])}.")
+
+
+def _find_or_fail(palace, memory_id):
+    from engram.lineage import LineageError
+    try:
+        drawer = palace.find_drawer(memory_id)
+    except LookupError as exc:
+        raise LineageError(str(exc)) from exc
+    if drawer is None:
+        raise LineageError(f"no memory with ID {memory_id!r}")
+    return drawer
+
+
+@app.command("history")
+def cmd_history(memory_id: str = typer.Argument(..., help="ID (or first 8+ characters) of a memory.")):
+    """Show whether a memory is current, and what replaced what, when and why."""
+    from rich.markup import escape
+
+    from engram.lineage import memory_history
+    h = _lineage_call(memory_history, _palace(), memory_id)
+    m = h["memory"]
+    colour = {"current": "green", "superseded": "yellow", "disputed": "red"}[h["status"]]
+    console.print(f"[bold]{m['id']}[/bold]  {escape(m['wing'] + '/' + m['room'] + '/' + m['hall'])}  "
+                  f"[{colour}]{h['status']}[/{colour}]")
+    console.print(f"  {escape(m['text'][:200])}")
+    if h["status"] == "superseded":
+        console.print(f"  Current version: [bold]{short_id(h['current_id'])}[/bold]")
+    if h["disputed_with"]:
+        console.print(f"  Disputed with: {', '.join(short_id(x) for x in h['disputed_with'])}")
+    if not h["history"]:
+        console.print("  [dim]No corrections recorded.[/dim]")
+        return
+    console.print("\n[bold]History[/bold] (oldest first)")
+    for step in h["history"]:
+        when = step["at"][:10]
+        why = f" — {escape(step['reason'])}" if step.get("reason") else ""
+        console.print(f"  {when}  {short_id(step['old'])} → {short_id(step['new'])}{why}")
+        if step.get("old_text"):
+            console.print(f"     [dim]was:[/dim] {escape(step['old_text'][:120])}")
+        if step.get("new_text"):
+            console.print(f"     [dim]now:[/dim] {escape(step['new_text'][:120])}")
+
+
+# ---------------------------------------------------------------------------
+# Backup and restore (engram.backup)
+# ---------------------------------------------------------------------------
+
+def _backup_paths() -> dict:
+    from engram import agents, config, knowledge_graph
+    return {"kg_path": knowledge_graph.DB_PATH, "identity_path": config.IDENTITY_PATH,
+            "agents_dir": agents.AGENTS_DIR.expanduser()}
+
+
+@app.command("export")
+def cmd_export(dest: str = typer.Argument(..., help="Backup file to write (.json, or .json.gz to compress).")):
+    """Back up every memory, correction, the knowledge graph and diaries to one file."""
+    from engram.backup import export_backup
+    counts = export_backup(Path(dest), _palace(), **_backup_paths())
+    console.print(f"[green]✓[/green] Backed up {_n(counts['drawers'], 'memory', 'memories')}, "
+                  f"{_n(counts['lineage_links'], 'correction')} and "
+                  f"{_n(counts['kg_triples'], 'knowledge-graph fact')} to {dest}")
+
+
+def _n(count: int, one: str, many: str = "") -> str:
+    return f"{count} {one if count == 1 else (many or one + 's')}"
+
+
+@app.command("import")
+def cmd_import(
+    src: str = typer.Argument(..., help="Backup file made by `engram export`."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Check the file and report, without changing anything."),
+    overwrite: bool = typer.Option(False, "--overwrite",
+                                   help="Replace stored memories that have the same ID but different content."),
+):
+    """Restore a backup. The whole file is checked first; if anything is wrong, nothing changes."""
+    from engram.backup import BackupError, import_backup
+    cfg = load_config()
+    try:
+        report = import_backup(Path(src), _palace(), backend=None if dry_run else _backend(cfg),
+                               overwrite=overwrite, dry_run=dry_run,
+                               preference_summaries=bool(cfg.get("preference_summaries", True)),
+                               **_backup_paths())
+    except BackupError as exc:
+        console.print(str(exc), style="red", markup=False)
+        raise typer.Exit(1)
+    prefix = "Would add" if dry_run else "Added"
+    console.print(f"[green]✓[/green] {prefix} {_n(report['drawers_added'], 'memory', 'memories')} "
+                  f"({report['drawers_skipped']} already present), "
+                  f"{_n(report['lineage_links_added'], 'correction')}"
+                  + ("" if dry_run else f", {_n(report['kg_triples_added'], 'knowledge-graph fact')}") + ".")
 
 # ---------------------------------------------------------------------------
 # engram provenance

@@ -90,7 +90,7 @@ That's all you need to try it.
 claude mcp add engram -- engram-mcp
 ```
 
-Claude now has 22 `engram_*` tools: search, remember, recall a topic's history, a knowledge graph of people and facts, and more. Ask *"remember that we use tabs in this repo"* or *"what did we decide about auth?"*
+Claude now has 26 `engram_*` tools: search, remember, correct an outdated memory, recall a topic's history, a knowledge graph of people and facts, and more. Ask *"remember that we use tabs in this repo"*, *"what did we decide about auth?"* or *"we moved to PostgreSQL, update that"*.
 
 **Optional: auto-save your Claude Code work.** Run `engram install-hooks` and paste the snippet it prints into `~/.claude/settings.json`. From then on, every file Claude edits is saved, and every conversation is saved before Claude Code compacts it.
 
@@ -138,7 +138,8 @@ Both put `engram` and `engram-mcp` on your PATH without touching your system Pyt
 - **🧠 It understands what you mean.** It finds *"we switched from Passport to Lucia"* when you ask about *"changing the auth library"*. It also matches exact names and numbers (`INV-20931`), and understands time: *"two weeks ago"*, *"in June"*, *"on May 8"*.
 - **💸 It's free to run.** It needs no LLM to save or search, so there are no per-message costs and nothing to rate-limit.
 - **🎯 It's accurate.** On the two standard tests of AI memory, it beats the best published no-LLM results ([numbers below](#how-good-is-it)).
-- **📖 You can read all of it.** About 7,000 lines of plain Python, MIT licensed. If you want to know exactly what happens to your data, you can.
+- **📖 You can read all of it.** About 8,400 lines of plain Python, MIT licensed. If you want to know exactly what happens to your data, you can.
+- **🔄 It knows when it's out of date.** When a decision changes, the new memory is marked as replacing the old one. Search gives you the current answer first, and the old one stays below it as history, with when and why it changed.
 - **🔑 It can hide secrets for you.** Turn on `redact_secrets` and API keys, tokens and passwords are blanked out before anything is written to disk.
 
 ---
@@ -166,6 +167,32 @@ You don't have to manage any of this; Engram sorts things as it saves them. When
 | **Reranker** *(optional)* | A small local model re-reads the top 20 and puts the best one first |
 
 At the start of a session, Engram can also hand the AI a tiny "wake-up" note (who it is plus key facts, about 170 tokens), so it never starts completely cold.
+
+---
+
+## When things change
+
+In March you note that the app stores everything in SQLite. In April you move to PostgreSQL. Most memory tools now hold two contradicting notes and return whichever matches the question best.
+
+In Engram, you (or Claude, or your agent) record the change once:
+
+```bash
+engram correct file-05aa607a "We migrated the app from SQLite to PostgreSQL on April 9" --reason "SQLite locked under concurrent writes"
+```
+
+From then on, search puts the current answer first and keeps the old one, clearly labelled, right below it:
+
+```text
+$ engram search "which database does the app use"
+  1  c6e0b7b4       [current, replaces file-05aa607a] We migrated the app from SQLite to PostgreSQL on April 9…
+  2  file-05aa607a  [outdated → c6e0b7b4] Decision: the app stores everything in SQLite because…
+```
+
+`engram history file-05aa607a` shows the whole story: what it said, what replaced it, when, and why. Nothing is ever silently deleted. Old evidence stays searchable, and a mistaken correction can be undone with `engram supersede <id> --undo`.
+
+Engram never decides by itself that one note contradicts another. Deciding what is true is the job of whoever is using it. When Claude saves a memory, Engram points out existing memories it might update, and Claude decides.
+
+**Backups.** `engram export backup.json.gz` puts every memory, correction, knowledge-graph fact and diary into one file. `engram import backup.json.gz` restores it on another computer, after checking the whole file first: if anything is wrong, nothing is changed. The format is documented in [docs/backup-format.md](docs/backup-format.md).
 
 ---
 
@@ -244,11 +271,19 @@ engram search "auth decisions" --wing myapp
 engram answer "What did we decide about the database?"   # a written answer (needs Ollama)
 engram replay --room auth-migration                # a topic's history, in order
 
+# Fix and keep things
+engram correct <id> "the new, correct version"     # replace an outdated memory (old one kept as history)
+engram history <id>                                # what replaced what, when and why
+engram export backup.json.gz                       # back up everything to one file
+engram import backup.json.gz                       # restore it (checked first; safe to repeat)
+
 # Look after it
 engram status                                      # what's in your memory
 engram wake-up                                     # the short start-of-session note
 engram audit --fix                                 # health check and safe fixes
 ```
+
+The ID is the short code in the first column of `engram search` results.
 
 <details>
 <summary><b>Full command reference</b></summary>
@@ -294,11 +329,21 @@ engram kg timeline "auth-migration"
 engram graph [--wing W] [--output file.png]   # needs: pip install "engram-chateau[viz]"
 ```
 
+### Corrections and backups
+```bash
+engram correct <id> "new text" [--reason "why"]  # save a correction that replaces <id>
+engram supersede <old-id> <new-id> [--reason R]  # mark an existing memory as replacing another
+engram supersede <old-id> --undo                 # make <old-id> current again
+engram history <id>                              # status and full replacement history
+engram export <file>[.gz]                        # back up everything to one file
+engram import <file> [--dry-run] [--overwrite]   # restore; the whole file is checked first
+```
+
 ### Maintenance
 ```bash
 engram status
 engram audit [--fix]
-engram conflicts                               # resolve contradicting memories
+engram conflicts                               # resolve contradicting knowledge-graph facts
 engram compress [--wing W] [--room R]          # rebuild short summaries (ES)
 engram provenance <drawer-id> [--history]
 engram provenance --summary
@@ -333,6 +378,7 @@ Everything works out of the box. If you want to tweak things, settings live in `
 
 - **`engram: command not found` after installing.** pip put it somewhere not on your PATH. Use `python3 -m pip install --user engram-chateau`, or install with `uv tool install engram-chateau` / `pipx install engram-chateau`, which handle PATH for you.
 - **`pip: command not found`.** Try `pip3` or `python3 -m pip`. Inside a `uv` virtual environment, use `uv pip install …`.
+- **Moving to a new computer.** Run `engram export backup.json.gz` on the old one, install Engram on the new one, then `engram import backup.json.gz`. Search indexes are rebuilt during the import.
 - **Claude doesn't show the engram tools.** Restart Claude Code or Claude Desktop after adding the server. If the app can't find `engram-mcp`, give it the full path from `which engram-mcp`.
 - **"ChromaDB failed to load".** ChromaDB's compiled parts don't match your Python. Try `pip install --force-reinstall --no-cache-dir chromadb`, or set `"vector_backend": "sqlitevec"`, which needs no compiled parts. Then run `engram mine` again, because each backend keeps its own index.
 - **Python 3.15 or newer.** ChromaDB can't install there yet, so Engram falls back to `sqlitevec`, which matches words rather than meaning. For meaning-based search, use Python 3.11 to 3.14.
@@ -382,7 +428,9 @@ compress("The authentication module is a critical component that has a dependenc
 | `engram/redact.py` | Optional secret redaction |
 | `engram/reranker.py` | Optional local reranker (ONNX) |
 | `engram/miner.py`, `engram/convo_miner.py` | Saving files and conversations |
-| `engram/mcp_server.py` | MCP server (22 tools), run as `engram-mcp` |
+| `engram/lineage.py` | Corrections: which memories are current, which were replaced, and why |
+| `engram/backup.py` | `engram export` / `engram import` |
+| `engram/mcp_server.py` | MCP server (26 tools), run as `engram-mcp` |
 | `engram/layers.py`, `engram/shorthand.py` | Wake-up note and ES shorthand |
 | `engram/knowledge_graph.py`, `engram/agents.py` | Knowledge graph and agent diaries |
 | `engram/backends/` | ChromaDB (default), FAISS, sqlite-vec |
