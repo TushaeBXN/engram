@@ -332,7 +332,7 @@ class EngramMCPServer:
     """Stateful MCP server — initialised once, tools share state."""
 
     def __init__(self) -> None:
-        from engram.backends import get_backend
+        from engram.backends import backend_from_config
         from engram.chateau import Chateau
         from engram.config import load_config
         from engram.knowledge_graph import KnowledgeGraph
@@ -341,7 +341,7 @@ class EngramMCPServer:
 
         self.cfg = load_config()
         self.palace = Chateau()
-        self.backend = get_backend(self.cfg.get("vector_backend", "chromadb"), fallback=True)
+        self.backend = backend_from_config(self.cfg)
         self.searcher = Searcher(self.backend, self.palace, self.cfg)
         self.stack = LayerStack(self.palace, self.searcher, self.cfg)
         self.kg = KnowledgeGraph()
@@ -366,7 +366,7 @@ class EngramMCPServer:
         from engram.indexing import index_drawer
         drawer = Drawer(content=content, wing=wing, room=room, hall=hall, pinned=pinned)
         self.palace.save_drawer(drawer)
-        index_drawer(self.backend, drawer.id, content, {
+        index_drawer(self.backend, drawer.id, drawer.content, {
             "wing": wing, "room": room, "hall": hall,
             "timestamp": drawer.timestamp, "pinned": pinned,
         })

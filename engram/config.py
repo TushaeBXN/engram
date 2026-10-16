@@ -21,6 +21,12 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # raised LongMemEval R@5 from 0.974 to 0.982.
     "temporal_weight": 0.4,
     "preference_summaries": True,
+    # Replace API keys, tokens and passwords with [REDACTED:...] before a
+    # drawer is saved (engram.redact). Off: drawers stay exactly as written.
+    "redact_secrets": False,
+    # Optional full-text keyword index (SQLite FTS5, BM25) searched alongside
+    # the embeddings, merged by reciprocal rank fusion (engram.keyword_index).
+    "keyword_search": False,
     # Optional local cross-encoder that reorders the top results
     # (engram.reranker). Off by default; turning it on downloads a ~90 MB
     # model once to ~/.engram/models/.

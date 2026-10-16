@@ -183,7 +183,11 @@ class TypedMemoryStore:
             **memory.to_drawer_metadata(),
         }
         from engram.indexing import index_drawer
-        index_drawer(self.backend, drawer.id, memory.content, meta)
+        text = memory.content
+        if getattr(self.palace, "redact", False):
+            from engram.redact import redact_secrets
+            text = redact_secrets(text)
+        index_drawer(self.backend, drawer.id, text, meta)
 
         return drawer.id
 

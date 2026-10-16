@@ -150,11 +150,11 @@ class Onboarder:
             answer = "n"
 
         if answer == "y":
-            from engram.backends import get_backend
+            from engram.backends import backend_from_config
             from engram.chateau import Chateau
             from engram.miner import Miner
             palace = Chateau()
-            backend = get_backend(self.cfg.get("vector_backend", "chromadb"), fallback=True)
+            backend = backend_from_config(self.cfg)
             miner = Miner(palace, backend, self.cfg)
             wing = self.cfg.get("default_wing", "default")
             with console.status(f"Mining [cyan]{project_dir}[/cyan]..."):
