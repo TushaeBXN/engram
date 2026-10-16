@@ -28,28 +28,38 @@ per question (each question builds its own index). Three configurations:
 
 - **Semantic**: the embedding score alone (runner default).
 - **Hybrid (keywords)**: plus the keyword boost (`--hybrid`).
-- **Default**: plus temporal boosting and preference summaries
-  (`--hybrid --temporal --preferences`), which is what Engram 1.3.0 does.
+- **1.3/1.4 default**: plus temporal boosting and preference summaries
+  (`--hybrid --temporal --preferences`), which is what Engram 1.3.0 and 1.4.0 do.
+- **1.5 default**: the same flags plus `--keywords`, run with Engram 1.5.0
+  code, which also understands absolute dates in questions. This is what
+  Engram does by default from 1.5.1.
 
-| Metric        | Semantic | Hybrid (keywords) | **Default** | Default + local reranker |
-|---------------|----------|-------------------|-------------|--------------------------|
-| R@1           | 0.868    | 0.874             | 0.888       | **0.924**                |
-| R@3           | 0.952    | 0.954             | 0.970       | 0.974                    |
-| **R@5**       | 0.968    | 0.974             | 0.982       | **0.988**                |
-| R@10          | 0.986    | 0.988             | 0.992       | 0.990                    |
-| recall_all@5  | 0.854    | 0.874             | 0.882       | 0.902                    |
-| NDCG@10       | 0.905    | 0.914             | 0.923       | 0.940                    |
+| Metric        | Semantic | Hybrid (keywords) | 1.4 default | 1.4 default + local reranker | **1.5 default** |
+|---------------|----------|-------------------|-------------|------------------------------|-----------------|
+| R@1           | 0.868    | 0.874             | 0.888       | **0.924**                    | 0.900           |
+| R@3           | 0.952    | 0.954             | 0.970       | 0.974                        | 0.968           |
+| **R@5**       | 0.968    | 0.974             | 0.982       | **0.988**                    | **0.988**       |
+| R@10          | 0.986    | 0.988             | 0.992       | 0.990                        | **0.998**       |
+| recall_all@5  | 0.854    | 0.874             | 0.882       | **0.902**                    | 0.886           |
+| NDCG@10       | 0.905    | 0.914             | 0.923       | **0.940**                    | 0.933           |
 
 By question type (R@5):
 
-| Type                      | n   | Semantic | Hybrid (keywords) | Default | + reranker |
-|---------------------------|-----|----------|-------------------|---------|------------|
-| single-session-assistant  | 56  | 1.000    | 1.000             | 1.000   | 1.000      |
-| knowledge-update          | 78  | 0.987    | 1.000             | 1.000   | 1.000      |
-| multi-session             | 133 | 0.992    | 0.992             | 0.992   | 0.992      |
-| single-session-user       | 70  | 0.914    | 0.929             | 0.971   | 0.986      |
-| single-session-preference | 30  | 0.967    | 0.967             | 0.967   | 1.000      |
-| temporal-reasoning        | 133 | 0.947    | 0.955             | 0.962   | 0.970      |
+| Type                      | n   | Semantic | Hybrid (keywords) | 1.4 default | + reranker | 1.5 default |
+|---------------------------|-----|----------|-------------------|-------------|------------|-------------|
+| single-session-assistant  | 56  | 1.000    | 1.000             | 1.000       | 1.000      | 1.000       |
+| knowledge-update          | 78  | 0.987    | 1.000             | 1.000       | 1.000      | 1.000       |
+| multi-session             | 133 | 0.992    | 0.992             | 0.992       | 0.992      | 0.992       |
+| single-session-user       | 70  | 0.914    | 0.929             | 0.971       | 0.986      | **1.000**   |
+| single-session-preference | 30  | 0.967    | 0.967             | 0.967       | **1.000**  | 0.967       |
+| temporal-reasoning        | 133 | 0.947    | 0.955             | 0.962       | 0.970      | 0.970       |
+
+The 1.5 default misses 6 questions at R@5 (1.4: 9) and only one at R@10, with
+no question type worse than 1.4. Dates and the keyword index were measured
+together here, so their individual shares are not separated on LongMemEval
+(on LoCoMo, below, they are). The reranker still puts the right session
+first more often (R@1 0.924 vs 0.900); it has not yet been run on top of the
+1.5 default.
 
 The reranker column adds `--rerank`: Engram's optional local cross-encoder
 (ms-marco-MiniLM-L-6-v2, ONNX, no LLM or API) reordering the top 20 results,
@@ -79,18 +89,19 @@ retrieved sessions, averaged over all questions in all five categories,
 exactly as MemPalace's `locomo_bench.py --granularity session` computes it
 (including its parsing of the evidence IDs).
 
-| Metric          | Semantic | 1.4.0 default | 1.4.0 + `--rerank` | **Default** (adds dates) | **+ `--keywords`** |
+| Metric          | Semantic | 1.4.0 default | 1.4.0 + `--rerank` | 1.5.0 default (adds dates) | **1.5.1 default** (+ `--keywords`) |
 |-----------------|----------|---------------|--------------------|--------------------------|--------------------|
 | **R@10**        | 0.844    | 0.874         | 0.887              | **0.901**                | **0.921**          |
 | R@5             | 0.727    | 0.783         | 0.828              | 0.821                    | **0.849**          |
 | Perfect (1.0)   | 1,595    | 1,658         | 1,691              | 1,715                    | 1,758              |
 | Zero (0.0)      | 231      | 179           | 159                | 127                      | 91                 |
 
-"Default" is `--hybrid --temporal --preferences` with the current code, which
+"1.5.0 default" is `--hybrid --temporal --preferences` with the current code, which
 also understands absolute dates in questions ("on 8 May 2023", "in June");
 252 of the 1,986 questions name one. `--keywords` adds the full-text keyword
 index (SQLite FTS5, BM25) merged with the meaning search by reciprocal rank
-fusion (k = 60), as Hindsight does. Neither was tuned on LoCoMo: the date
+fusion (k = 60), as Hindsight does. From 1.5.1 the keyword index is on by default, so
+the last column is Engram's default search. Neither was tuned on LoCoMo: the date
 windows and the fusion constant were set before these runs.
 
 By category (R@10), using MemPalace's category names:
@@ -151,7 +162,9 @@ python benchmarks/longmemeval_bench.py ~/datasets/longmemeval/longmemeval_s_clea
 python benchmarks/longmemeval_bench.py ~/datasets/longmemeval/longmemeval_s_cleaned.json \
   --hybrid --out lme_hybrid.jsonl        # keyword boost only
 python benchmarks/longmemeval_bench.py ~/datasets/longmemeval/longmemeval_s_cleaned.json \
-  --hybrid --temporal --preferences --out lme_default.jsonl   # Engram's default search (98.2%)
+  --hybrid --temporal --preferences --out lme_14.jsonl        # 1.4 default search (98.2%)
+python benchmarks/longmemeval_bench.py ~/datasets/longmemeval/longmemeval_s_cleaned.json \
+  --hybrid --temporal --preferences --keywords --out lme_default.jsonl   # Engram's default search (98.8%)
 ```
 
 `--hybrid` applies the keyword boost Engram uses by default (`hybrid_weight`

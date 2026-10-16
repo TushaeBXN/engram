@@ -98,11 +98,15 @@ def test_searcher_finds_what_only_keywords_match(tmp_path, sqlite_backend):
     assert [h["id"] for h in hits] == ["d1"] and hits[0]["metadata"]["room"] == "bills"
 
 
-def test_keyword_search_off_by_default(engram_home):
-    assert DEFAULT_CONFIG["keyword_search"] is False
+def test_keyword_search_on_by_default_and_can_be_turned_off(engram_home, monkeypatch):
+    monkeypatch.setattr(sv, "_get_embedder", lambda: None)
+    assert DEFAULT_CONFIG["keyword_search"] is True
     from engram.config import load_config
-    be = backend_from_config(load_config(), fallback=True)
-    assert not hasattr(be, "keyword_search")
+    cfg = load_config()
+    be = backend_from_config(cfg, fallback=True)
+    assert hasattr(be, "keyword_search")
+    assert (engram_home / "keyword_index.db").exists()
+    assert not hasattr(backend_from_config({**cfg, "keyword_search": False}), "keyword_search")
 
 
 def test_backend_from_config_builds_index_from_existing_drawers(engram_home, tmp_path, monkeypatch):

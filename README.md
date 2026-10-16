@@ -8,7 +8,7 @@
 [![PyPI](https://img.shields.io/pypi/v/engram-chateau)](https://pypi.org/project/engram-chateau/)
 [![CI](https://github.com/TushaeBXN/engram/actions/workflows/ci.yml/badge.svg)](https://github.com/TushaeBXN/engram/actions/workflows/ci.yml)
 
-**98.8% on LongMemEval** (the right conversation in the top 5 for 494 of 500 questions) and **92.1% on LoCoMo**, with no LLM, no API key and nothing leaving your machine. Both are ahead of MemPalace's best no-LLM scores (98.4% and 88.9%). These are Engram's optional modes (local reranker, keyword index); out of the box it scores 98.2% and 90.1%. [See the numbers](#how-well-does-it-work)
+**98.8% on LongMemEval** (the right conversation in the top 5 for 494 of 500 questions) and **92.1% on LoCoMo**, out of the box, with no LLM, no API key and nothing leaving your machine. Both are ahead of MemPalace's best no-LLM scores (98.4% and 88.9%). [See the numbers](#how-well-does-it-work)
 
 ---
 
@@ -67,13 +67,13 @@ engram install-hooks                                   # optional: auto-save fro
 
 `engram install-hooks` prints a short snippet to paste into `~/.claude/settings.json`.
 
-**3. Optional: switch on the best-accuracy modes:**
+**3. Optional: add the local reranker:**
 
 ```bash
 engram setup-reranker      # downloads a 90 MB model once; everything still runs locally
 ```
 
-and add `"keyword_search": true` to `~/.engram/config.json` for the full-text keyword index (no download; built from your existing memories on first use).
+It puts the single best match first more often (see the R@1 numbers in [benchmarks/BENCHMARKS.md](benchmarks/BENCHMARKS.md)). Search is already at its benchmark scores without it.
 
 **That's it.** Ask Claude to remember or look something up, or use the command line:
 
@@ -103,7 +103,7 @@ Wing   – a person or project        (e.g. "myapp")
 |---|---|---|
 | Meaning | Finds text that means the same thing, even with different words | Yes |
 | Keyword boost | Gives extra weight to results that share your exact words, names or numbers | Yes |
-| Keyword index | A second, full-text search (BM25) that finds memories the meaning search missed, merged with it by rank | Optional (`"keyword_search": true`) |
+| Keyword index | A second, full-text search (BM25) that finds memories the meaning search missed, merged with it by rank | Yes |
 | Time | "What did I buy **two weeks ago**?" or "what happened **in June**?" favours memories from around that date | Yes |
 | Preferences | Notices things you mentioned in passing ("I've been struggling with my sleep") so later questions find them | Yes |
 | Recency | Slightly favours newer memories; pinned memories are never pushed down | Yes |
@@ -122,8 +122,9 @@ Two public benchmarks measure whether a memory system can find the right past co
 | | Engram | MemPalace |
 |---|---|---|
 | Meaning-only search | **96.8%** | 96.6% |
-| Default search (no AI model) | 98.2% | 98.4% |
-| With local reranker (no LLM, no API) | **98.8%** | — |
+| Default search (no AI model) | **98.8%** | 98.4% |
+| 1.4.0 default (before dates and the keyword index) | 98.2% | — |
+| 1.4.0 default + local reranker (no LLM, no API) | 98.8% | — |
 | With an LLM reranker (needs an API key) | not offered | 99%+ |
 
 **LoCoMo:** 1,986 questions over 10 very long conversations. The score is how many of the answer's sessions are in the top 10 results.
@@ -131,18 +132,18 @@ Two public benchmarks measure whether a memory system can find the right past co
 | | Engram | MemPalace |
 |---|---|---|
 | Meaning-only search | **84.4%** | 60.3% |
-| Default search (no AI model) | **90.1%** | 88.9% |
-| With keyword index (no AI model) | **92.1%** | — |
-| R@5: default / with keyword index | 82.1% / **84.9%** | 83.7% |
+| Default search (no AI model) | **92.1%** | 88.9% |
+| Default without the keyword index | 90.1% | — |
+| R@5, default search | **84.9%** | 83.7% |
 
-**In short:** Engram's plain search is as good as or better than MemPalace's, and its best no-LLM modes are ahead on both benchmarks. Engram never needs an LLM or an API to get there.
+**In short:** Engram's default search is ahead of MemPalace's best no-LLM results on both benchmarks, and it never needs an LLM or an API to get there.
 
 Things to know when comparing:
 - **Model:** all numbers use the same small local embedding model (all-MiniLM-L6-v2).
 - **What gets indexed:** Engram indexes the assistant's messages as well as yours; MemPalace's raw mode indexes only yours.
 - **How the hybrids were tuned:** MemPalace tuned its LongMemEval hybrid on 50 questions and scored the other 450. Engram's settings were written as general rules and scored on all 500, then used unchanged on LoCoMo.
 - **Scale:** one LongMemEval question is worth 0.2 points.
-- **Versions:** the LongMemEval numbers were measured with Engram 1.4.0, before date understanding and the keyword index were added; the LoCoMo numbers include them.
+- **Versions:** the default rows were measured with Engram 1.5 (dates in questions and the keyword index on). The 1.4.0 rows are kept for comparison; the reranker has not yet been re-measured on top of 1.5.
 
 Per-question-type results are in [benchmarks/BENCHMARKS.md](benchmarks/BENCHMARKS.md).
 
@@ -289,7 +290,7 @@ Settings live in `~/.engram/config.json`. Every key is optional, and the default
 | `hybrid_weight` | `0.3` | Keyword boost; `0` turns it off |
 | `temporal_weight` | `0.4` | Boost for memories near a time the question names; `0` turns it off |
 | `preference_summaries` | `true` | Index a short summary of preferences and concerns mentioned in your messages |
-| `keyword_search` | `false` | Full-text keyword index searched alongside meaning search (SQLite, no download). Built from your existing memories the first time it's on |
+| `keyword_search` | `true` | Full-text keyword index searched alongside meaning search (SQLite, no download). Built from your existing memories the first time it's on |
 | `redact_secrets` | `false` | Replace API keys, tokens and passwords with `[REDACTED:…]` before anything is saved. Off by default because Engram otherwise keeps text exactly as written |
 | `reranker` | `false` | Local reranker; switch on with `engram setup-reranker`. While off, Engram never downloads anything |
 | `rerank_top` | `20` | How many top results the reranker reorders |
