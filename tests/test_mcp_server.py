@@ -186,3 +186,16 @@ def test_stdio_session(tmp_path):
     status = json.loads(responses[2]["result"]["content"][0]["text"])
     assert status["drawers"] == 1
     assert responses[3]["error"]["code"] == -32700
+
+
+def test_engram_mcp_command_points_at_the_server():
+    """`claude mcp add engram -- engram-mcp` relies on this console script."""
+    import re
+    from pathlib import Path
+
+    import engram.mcp_server as mcp
+
+    pyproject = (Path(__file__).resolve().parent.parent / "pyproject.toml").read_text()
+    target = re.search(r'^engram-mcp = "([\w.]+):(\w+)"', pyproject, re.M)
+    assert target and target.group(1) == "engram.mcp_server"
+    assert callable(getattr(mcp, target.group(2)))

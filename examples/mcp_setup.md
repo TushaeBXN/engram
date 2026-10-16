@@ -3,19 +3,20 @@
 ## Starting the server
 
 ```bash
-python -m engram.mcp_server
+engram-mcp                    # or: python -m engram.mcp_server
 ```
+
+For Claude Code: `claude mcp add engram -- engram-mcp`
 
 ## Claude Desktop config
 
-Add to `~/.config/claude/claude_desktop_config.json`:
+Add to `claude_desktop_config.json` (macOS: `~/Library/Application Support/Claude/`, Windows: `%APPDATA%\Claude\`):
 
 ```json
 {
   "mcpServers": {
     "engram": {
-      "command": "python",
-      "args": ["-m", "engram.mcp_server"]
+      "command": "engram-mcp"
     }
   }
 }

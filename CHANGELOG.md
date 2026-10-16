@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.5.2
+
+**`engram-mcp` command.** Installing Engram now also installs `engram-mcp`,
+which starts the MCP server. Connecting Claude Code is one line that works
+however Engram was installed (pip, pipx or uv tool):
+`claude mcp add engram -- engram-mcp`. `python -m engram.mcp_server` still
+works.
+
+**README rewritten** for people trying Engram for the first time: what
+problem it solves, a real before-and-after example, a two-minute install, and
+the benchmarks in plain terms. It now says up front that the embedding model
+(about 80 MB) downloads on first use.
+
 ## 1.5.1
 
 **Keyword index on by default.** `keyword_search` now defaults to `true`.
