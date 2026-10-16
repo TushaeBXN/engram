@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.5.1
+
+**Keyword index on by default.** `keyword_search` now defaults to `true`.
+Measured on LongMemEval with the 1.5.0 code (`--hybrid --temporal
+--preferences --keywords`): R@5 0.988 (1.4.0 default: 0.982), R@10 0.998,
+R@1 0.900, with no question type worse. That matches the 1.4.0 default plus
+the local reranker on R@5, without the reranker. On LoCoMo it gives R@10
+0.921 and R@5 0.849. The index is built from your existing memories the
+first time Engram starts after upgrading. Set `"keyword_search": false` in
+`~/.engram/config.json` to turn it off. Code that builds its own backend with
+`get_backend()` (rather than `backend_from_config()`) is unchanged.
+
 ## 1.5.0
 
 Ideas adapted from [Hindsight](https://github.com/vectorize-io/hindsight),
