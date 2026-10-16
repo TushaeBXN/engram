@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.5.0
 
 Ideas adapted from [Hindsight](https://github.com/vectorize-io/hindsight),
 kept local and LLM-free.
