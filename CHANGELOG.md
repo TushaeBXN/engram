@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.7.0
+
+**Auto-recall for Claude Code** (`engram.recall`). A `UserPromptSubmit` hook
+searches Engram each time you send Claude a message and, only when something
+clearly matches, adds a short note to Claude's context: up to 3 memories
+(`recall_max`), each trimmed, with where and when they're from, current
+versions first and outdated ones labelled. It adds nothing when nothing
+clears `recall_min_relevance` (0.35 meaning similarity), never repeats a
+memory within a Claude session, skips short messages and slash commands,
+never shows wings in `recall_exclude_wings` (default: `library`), and any
+error simply adds nothing. About a second per message once warm. Each run is
+logged to `~/.engram/recall.log` (counts and timing, not your text) so you
+can judge whether it helps. Turn it off with `"recall": false`.
+
+**Easier hook setup.** `engram install-hooks --apply` adds the auto-recall,
+auto-save and pre-compact hooks to `~/.claude/settings.json` itself, keeping
+your other settings and a `.bak` copy; running it again changes nothing.
+`--no-recall` leaves auto-recall out. The recall hook runs with the same
+Python that has Engram, so PATH differences can't break it. New:
+`engram recall "message"` previews what Claude would be given, and an
+`engram-recall` console script.
+
 ## 1.6.0
 
 Memories can now be corrected, and Engram keeps track of which version is
