@@ -22,7 +22,7 @@ Add to `claude_desktop_config.json` (macOS: `~/Library/Application Support/Claud
 }
 ```
 
-## Available tools (22)
+## Available tools (26)
 
 | Tool | Description |
 |------|-------------|
@@ -48,3 +48,7 @@ Add to `claude_desktop_config.json` (macOS: `~/Library/Application Support/Claud
 | `engram_audit` | Health audit |
 | `engram_replay` | Session replay |
 | `engram_pin` | Pin a drawer (bypass decay) |
+| `engram_correct` | Save a correction that replaces an outdated memory |
+| `engram_supersede` | Mark one stored memory as replacing another (`undo` to reverse) |
+| `engram_dispute` | Mark two memories as conflicting, undecided |
+| `engram_history` | A memory's status and replacement history |

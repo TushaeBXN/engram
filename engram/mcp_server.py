@@ -1,4 +1,4 @@
-"""Engram MCP Server — 22 tools for Claude, ChatGPT, and Cursor.
+"""Engram MCP Server — 26 tools for Claude, ChatGPT, and Cursor.
 
 Implements the Model Context Protocol over stdio.  Start with::
 
@@ -6,7 +6,7 @@ Implements the Model Context Protocol over stdio.  Start with::
 
 All tools are prefixed ``engram_``.
 
-Tool list (22):
+Tool list (26):
     1.  engram_search          — semantic search
     2.  engram_add_memory      — store a new drawer
     3.  engram_wake_up         — return L0+L1 context
@@ -28,7 +28,11 @@ Tool list (22):
     19. engram_status          — château stats
     20. engram_audit           — health audit (NEW)
     21. engram_replay          — session replay (NEW)
-    22. engram_pin             — pin a drawer (NEW)
+    22. engram_pin             — pin a drawer
+    23. engram_correct         — save a correction that replaces a memory
+    24. engram_supersede       — mark one stored memory as replacing another
+    25. engram_dispute         — mark two memories as conflicting, undecided
+    26. engram_history         — a memory's status and replacement history
 """
 
 from __future__ import annotations
@@ -81,7 +85,9 @@ TOOLS: list[dict] = [
     },
     {
         "name": "engram_add_memory",
-        "description": "Store a new memory drawer in the château.",
+        "description": ("Store a new memory drawer in the château. The result lists "
+                        "'possible_updates': existing memories this one may replace. If it "
+                        "does, call engram_supersede (or pass 'supersedes' here)."),
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -90,6 +96,8 @@ TOOLS: list[dict] = [
                 "room": {"type": "string", "default": "general"},
                 "hall": {"type": "string", "default": "facts", "enum": ["facts", "events", "discoveries", "preferences", "advice"]},
                 "pinned": {"type": "boolean", "default": False},
+                "supersedes": {"type": "string", "description": "ID of a memory this one replaces (optional)"},
+                "reason": {"type": "string", "description": "Why it replaces it (used with 'supersedes')"},
             },
             "required": ["content"],
         },
@@ -321,6 +329,60 @@ TOOLS: list[dict] = [
             "required": ["drawer_id"],
         },
     },
+    {
+        "name": "engram_correct",
+        "description": ("Save a correction: a new memory that replaces an outdated one (same "
+                        "wing/room/hall). The old memory stays searchable but is marked "
+                        "superseded, and search shows the correction first. Safe to retry."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "memory_id": {"type": "string", "description": "ID (or unique prefix) of the outdated memory"},
+                "content": {"type": "string", "description": "The corrected, current information"},
+                "reason": {"type": "string", "description": "Why it changed"},
+            },
+            "required": ["memory_id", "content"],
+        },
+    },
+    {
+        "name": "engram_supersede",
+        "description": ("Record that one stored memory replaces another (e.g. 'we moved to "
+                        "PostgreSQL' replaces 'we use SQLite'). Set undo=true to make the old "
+                        "memory current again. Safe to retry."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "old_id": {"type": "string", "description": "ID of the outdated memory"},
+                "new_id": {"type": "string", "description": "ID of the memory that replaces it"},
+                "reason": {"type": "string"},
+                "undo": {"type": "boolean", "default": False},
+            },
+            "required": ["old_id"],
+        },
+    },
+    {
+        "name": "engram_dispute",
+        "description": "Mark two memories as conflicting when it is not yet clear which is right.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "id_a": {"type": "string"},
+                "id_b": {"type": "string"},
+                "reason": {"type": "string"},
+            },
+            "required": ["id_a", "id_b"],
+        },
+    },
+    {
+        "name": "engram_history",
+        "description": ("A memory's status (current, superseded or disputed), what replaced it, "
+                        "what it replaced, when and why."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"memory_id": {"type": "string"}},
+            "required": ["memory_id"],
+        },
+    },
 ]
 
 
@@ -361,16 +423,61 @@ class EngramMCPServer:
     def _tool_engram_search(self, query, n=10, wing=None, room=None, no_decay=False):
         return self.searcher.search(query, n=n, wing=wing, room=room, no_decay=no_decay)
 
-    def _tool_engram_add_memory(self, content, wing="default", room="general", hall="facts", pinned=False):
+    def _tool_engram_add_memory(self, content, wing="default", room="general", hall="facts", pinned=False,
+                                supersedes=None, reason=""):
         from engram.chateau import Drawer
         from engram.indexing import index_drawer
+        from engram.lineage import possible_updates, supersede_memory
+        if supersedes:  # fail before saving anything if the link would be refused
+            self.palace.find_drawer(supersedes) or self._missing(supersedes)
         drawer = Drawer(content=content, wing=wing, room=room, hall=hall, pinned=pinned)
         self.palace.save_drawer(drawer)
         index_drawer(self.backend, drawer.id, drawer.content, {
             "wing": wing, "room": room, "hall": hall,
             "timestamp": drawer.timestamp, "pinned": pinned,
         })
-        return drawer.to_dict()
+        result = drawer.to_dict()
+        if supersedes:
+            try:
+                result["supersedes"] = supersede_memory(self.palace, supersedes, drawer.id,
+                                                        reason=reason, by="mcp")["link"]
+            except Exception:  # all or nothing: drop the new memory again
+                from engram.indexing import unindex_drawer
+                unindex_drawer(self.backend, drawer.id)
+                self.palace.delete_drawer(wing, room, hall, drawer.id)
+                raise
+        else:
+            result["possible_updates"] = possible_updates(self.backend, self.palace, drawer)
+        return result
+
+    @staticmethod
+    def _missing(memory_id):
+        from engram.lineage import LineageError
+        raise LineageError(f"no memory with ID {memory_id!r}")
+
+    def _tool_engram_correct(self, memory_id, content, reason=""):
+        from engram.lineage import correct_memory
+        return correct_memory(self.palace, self.backend, memory_id, content, reason=reason, by="mcp")
+
+    def _tool_engram_supersede(self, old_id, new_id=None, reason="", undo=False):
+        from engram.lineage import Lineage, LineageError, supersede_memory
+        if undo:
+            drawer = self.palace.find_drawer(old_id) or self._missing(old_id)
+            return {"restored": Lineage(self.palace.path).restore(drawer.id), "id": drawer.id}
+        if not new_id:
+            raise LineageError("new_id is required unless undo is true")
+        return supersede_memory(self.palace, old_id, new_id, reason=reason, by="mcp")
+
+    def _tool_engram_dispute(self, id_a, id_b, reason=""):
+        from engram.lineage import Lineage
+        a = self.palace.find_drawer(id_a) or self._missing(id_a)
+        b = self.palace.find_drawer(id_b) or self._missing(id_b)
+        link, created = Lineage(self.palace.path).dispute(a.id, b.id, reason=reason, by="mcp")
+        return {"link": link, "created": created}
+
+    def _tool_engram_history(self, memory_id):
+        from engram.lineage import memory_history
+        return memory_history(self.palace, memory_id)
 
     def _tool_engram_wake_up(self, wing=None, rebuild_l1=False):
         return self.stack.wake_up(wing=wing, rebuild_l1=rebuild_l1)

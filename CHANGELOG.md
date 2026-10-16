@@ -1,5 +1,58 @@
 # Changelog
 
+## 1.6.0
+
+Memories can now be corrected, and Engram keeps track of which version is
+current. The model stays the same: Engram does not decide on its own that one
+note contradicts another. The agent or person using it records that decision,
+and Engram keeps the links sound and makes search and history use them.
+
+**Corrections and lineage** (`engram.lineage`).
+- `engram correct <id> "new text"` (MCP: `engram_correct`) saves a
+  correction in the same wing/room/hall and marks the old memory superseded.
+- `engram supersede <old> <new>` (MCP: `engram_supersede`) links two stored
+  memories, and `--undo` reverses that.
+- `engram_dispute` marks two memories as conflicting, undecided.
+- Links live in `<chateau>/lineage.json`. Every memory without a link is
+  current, so existing data needs no migration.
+- **Search is history-aware.** Each result has a `status` (`current`,
+  `superseded` or `disputed`). An outdated memory is still returned, directly
+  below its current replacement, with `superseded_by`, `current_id`,
+  `replaced_at` and `reason`. If search found only the old memory, its
+  replacement is added above it. Without any links, results are unchanged
+  apart from `status: "current"`.
+- `engram history <id>` (MCP: `engram_history`) shows a memory's status and
+  the whole replacement chain, with dates and reasons.
+- **Rules that keep history sound.** A memory is replaced by at most one
+  other; only a current memory can be a replacement, so there are no cycles.
+  Repeating a link or a correction is a no-op. Each change is a single atomic
+  file replace under a lock. A correction whose link is refused removes the
+  memory it just saved.
+- `engram_add_memory` lists `possible_updates`: existing memories in the same
+  wing the new one may replace. This is only a hint; nothing is linked until
+  the agent says so. It also accepts `supersedes` and `reason`.
+- `engram search` shows a short ID column and labels outdated, current and
+  disputed memories. Commands accept a unique ID prefix of 4 or more characters.
+
+**Backup and restore** (`engram.backup`).
+- `engram export FILE[.gz]` writes every drawer (IDs, timestamps, tags, pinned
+  state), wings, rooms, closets, tunnels, the lineage ledger, provenance, the
+  knowledge graph, identity, and agent profiles and diaries to one JSON file.
+- `engram import FILE` checks the whole file first: format version, names,
+  duplicate IDs, clashes with stored memories, and that the merged lineage is
+  sound. If anything fails, nothing is written. It then restores and rebuilds
+  the search indexes.
+- Re-importing is safe: identical items are skipped. `--dry-run` reports
+  without writing; `--overwrite` replaces memories whose content differs.
+- The format is documented in `docs/backup-format.md`.
+
+**Compatibility.**
+- Existing search, save and Python API calls behave as before, and the MCP
+  server keeps its 22 tools (now 26).
+- `Drawer.from_dict` ignores fields it doesn't know, so drawers written by a
+  newer Engram still load.
+- The `provenance/` folder is no longer listed as a wing.
+
 ## 1.5.2
 
 **`engram-mcp` command.** Installing Engram now also installs `engram-mcp`,

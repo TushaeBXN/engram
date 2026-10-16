@@ -31,6 +31,8 @@ from engram.config import get_chateau_path
 # Hall types recognised by the château
 # ---------------------------------------------------------------------------
 HALL_TYPES = ("facts", "events", "discoveries", "preferences", "advice")
+# Directories at the château root that hold bookkeeping, not wings.
+RESERVED_DIRS = ("provenance",)
 
 
 # ---------------------------------------------------------------------------
@@ -87,7 +89,8 @@ class Drawer:
     @classmethod
     def from_dict(cls, d: dict) -> Drawer:
         d = {"compressed": True, **d}  # legacy drawers stored ES-compressed text
-        return cls(**d)
+        known = cls.__dataclass_fields__
+        return cls(**{k: v for k, v in d.items() if k in known})  # ignore fields from newer versions
 
     def text(self) -> str:
         """Readable content: the original text, or an expansion of legacy ES text."""
@@ -235,7 +238,7 @@ class Chateau:
     def list_wings(self) -> list[Wing]:
         wings = []
         for p in sorted(self.path.iterdir()):
-            if p.is_dir():
+            if p.is_dir() and p.name not in RESERVED_DIRS:
                 meta = p / "wing.json"
                 if meta.exists():
                     wings.append(Wing.from_dict(json.loads(meta.read_text())))
@@ -376,6 +379,27 @@ class Chateau:
             p.unlink()
             removed += 1
         return removed
+
+    def find_drawer(self, id_or_prefix: str) -> Optional[Drawer]:
+        """The drawer with this ID, or the only one whose ID starts with it.
+
+        Accepts a prefix of at least 4 characters (``engram search`` shows a short one),
+        and raises ``LookupError`` when a prefix matches more than one drawer.
+        """
+        key = (id_or_prefix or "").strip()
+        if len(key) < 4 or any(c in key for c in "/\\*?[]\0"):
+            return None
+        exact = list(self.path.glob(f"*/*/*/{key}.json"))
+        matches = exact or list(self.path.glob(f"*/*/*/{key}*.json"))
+        ids = {p.stem for p in matches}
+        if len(ids) > 1:
+            raise LookupError(f"'{key}' matches {len(ids)} memories; use more of the ID")
+        for p in matches:
+            try:
+                return Drawer.from_dict(json.loads(p.read_text()))
+            except (json.JSONDecodeError, TypeError, KeyError):
+                continue
+        return None
 
     def pin_drawer(self, drawer_id: str) -> Optional[Drawer]:
         """Find a drawer by ID anywhere in the château and pin it."""

@@ -33,6 +33,7 @@ from engram.backends.base import VectorBackend
 from engram.chateau import Chateau, Drawer
 from engram.config import load_config
 from engram.indexing import drawer_id_of
+from engram.lineage import Lineage, annotate
 from engram.temporal import temporal_closeness, time_reference
 
 
@@ -54,6 +55,8 @@ class Searcher:
         self.backend = backend
         self.palace = palace
         self.config = config or load_config()
+        path = getattr(palace, "path", None)
+        self.lineage = Lineage(path) if path is not None else None
 
     # ------------------------------------------------------------------
 
@@ -107,7 +110,14 @@ class Searcher:
                     "temporal_closeness": float,
                     "final_score": float,
                     "pinned": bool,
+                    "status": "current" | "superseded" | "disputed",
+                    # plus, for corrected memories: "superseded_by",
+                    # "current_id", "replaced_at", "reason", "supersedes",
+                    # "disputed_with" (see engram.lineage.annotate)
                 }
+
+            A memory that was replaced is still returned, directly below
+            its current replacement.
         """
         where = _build_where(wing, room, hall)
         # Over-fetch: several hits may be chunks of the same drawer.
@@ -176,6 +186,9 @@ class Searcher:
             if model is not None:
                 results = rerank_results(query, results, model,
                                          top=int(self.config.get("rerank_top", 20)))
+        # Lineage: label outdated memories and put their replacement first.
+        if self.lineage is not None:
+            results = annotate(results, self.lineage, self.palace.find_drawer)
         return results[:n]
 
     def get_by_id(self, drawer_id: str) -> Optional[Drawer]:
