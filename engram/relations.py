@@ -140,6 +140,15 @@ class Relations:
             self._write(kept)
             return True
 
+    def forget(self, memory_id: str) -> int:
+        """Drop every evidence link that mentions *memory_id* (the memory was deleted). Returns how many."""
+        with _locked_dir(self.dir, RELATIONS_FILE):
+            links = self.links()
+            kept = [lk for lk in links if memory_id not in (lk["from"], lk["to"])]
+            if len(kept) != len(links):
+                self._write(kept)
+            return len(links) - len(kept)
+
     def replace_all(self, links: list[dict]) -> None:
         """Write *links* as the whole ledger (used by import, after validation)."""
         validate_relations(links)

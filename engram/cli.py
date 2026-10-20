@@ -578,6 +578,35 @@ def cmd_history(memory_id: str = typer.Argument(..., help="ID (or first 8+ chara
 # Evidence and explanations (engram.relations)
 # ---------------------------------------------------------------------------
 
+@app.command("forget")
+def cmd_forget(
+    memory_id: str = typer.Argument(..., help="ID (or first 8+ characters) of the memory to delete."),
+    yes: bool = typer.Option(False, "--yes", help="Actually delete it. Without this, only show what would happen."),
+):
+    """Delete a memory for good, and clean every correction and evidence link that pointed at it."""
+    from rich.markup import escape
+
+    from engram.forget import forget, plan
+    palace = _palace()
+    what = _lineage_call(plan, palace, memory_id)
+    m = what["memory"]
+    console.print(f"[bold]{m['id']}[/bold]  {escape(m['wing'] + '/' + m['room'] + '/' + m['hall'])}  {m['timestamp'][:10]}")
+    console.print(f"  {escape(m['text'])}", highlight=False)
+    notes = [("becomes current again", "becomes_current_again"),
+             ("stops saying it replaced something", "loses_its_replaced_label"),
+             ("loses its conflict mark", "conflict_marks_removed"),
+             ("loses it as evidence", "memories_that_lose_it_as_evidence")]
+    for label, key in notes:
+        for other in what[key]:
+            console.print(f"  [yellow]{label}:[/yellow] {short_id(other['id'])}  {escape(other['text'][:90])}", highlight=False)
+    if not yes:
+        console.print("\n[dim]Nothing was deleted. Add --yes to delete it. It can't be undone, and earlier "
+                      "exports still contain it.[/dim]")
+        return
+    _lineage_call(forget, palace, _backend(), memory_id)
+    console.print(f"[green]✓[/green] Forgot {short_id(m['id'])}.")
+
+
 @app.command("link")
 def cmd_link(
     memory_id: str = typer.Argument(..., help="ID (or first 8+ characters) of a memory."),

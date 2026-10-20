@@ -667,11 +667,11 @@ class EngramMCPServer:
         return None
 
     def _tool_engram_delete_drawer(self, wing, room, hall, drawer_id):
-        from engram.indexing import unindex_drawer
-        ok = self.palace.delete_drawer(wing, room, hall, drawer_id)
-        if ok:
-            unindex_drawer(self.backend, drawer_id)
-        return {"deleted": ok}
+        from engram.forget import forget
+        if self.palace.get_drawer(wing, room, hall, drawer_id) is None:
+            return {"deleted": False}
+        forget(self.palace, self.backend, drawer_id)              # also cleans correction and evidence links
+        return {"deleted": True}
 
     def _tool_engram_create_wing(self, name, description=""):
         w = self.palace.create_wing(name, description=description)
