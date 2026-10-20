@@ -6,7 +6,7 @@
 engram-mcp                    # or: python -m engram.mcp_server
 ```
 
-For Claude Code: `claude mcp add engram -- engram-mcp`
+For Claude Code: `claude mcp add engram -- engram-mcp`. For Cursor, Windsurf, VS Code, Gemini CLI, Codex and Claude Desktop: `engram connect <app>`.
 
 ## Claude Desktop config
 
@@ -22,7 +22,7 @@ Add to `claude_desktop_config.json` (macOS: `~/Library/Application Support/Claud
 }
 ```
 
-## Available tools (26)
+## Available tools (27)
 
 | Tool | Description |
 |------|-------------|
@@ -52,3 +52,4 @@ Add to `claude_desktop_config.json` (macOS: `~/Library/Application Support/Claud
 | `engram_supersede` | Mark one stored memory as replacing another (`undo` to reverse) |
 | `engram_dispute` | Mark two memories as conflicting, undecided |
 | `engram_history` | A memory's status and replacement history |
+| `engram_recall` | The few memories clearly relevant to a message (auto-recall for any app) |

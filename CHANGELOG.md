@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.8.0
+
+**Engram for any AI app, not just Claude Code.**
+- `engram connect <app>` adds Engram's MCP server to Claude Desktop, Cursor,
+  Windsurf, VS Code (Copilot agent mode), Gemini CLI or Codex CLI, editing
+  that app's own settings file (keeping everything else, with a `.bak`
+  backup; running it again changes nothing). `engram connect all` does every
+  installed app; `engram connect` lists them. Zed and LM Studio get the
+  snippet to paste. The server runs with the Python that has Engram, so PATH
+  doesn't matter.
+- **Memory guidance for every client.** On connect, the MCP server now sends
+  `instructions`: check memory (`engram_recall`) before answering anything
+  that depends on past work, save decisions, and correct rather than
+  contradict. Clients that pass server instructions to the model get Engram's
+  "remember first" behaviour without a hook.
+- New MCP tool `engram_recall`: the same filtered, project-aware recall the
+  Claude Code hook uses, for any app (27 tools).
+
 ## 1.7.1
 
 **Project-aware memory for Claude Code.**
