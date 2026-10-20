@@ -249,6 +249,15 @@ class Lineage:
             self._write(links)
             return link, True
 
+    def forget(self, memory_id: str) -> int:
+        """Drop every link that mentions *memory_id* (the memory was deleted). Returns how many."""
+        with self._locked():
+            links = self.links()
+            kept = [lk for lk in links if memory_id not in (lk["old"], lk["new"])]
+            if len(kept) != len(links):
+                self._write(kept)
+            return len(links) - len(kept)
+
     def undispute(self, a: str, b: str) -> bool:
         """Remove the conflict mark between *a* and *b*. Returns False if there was none."""
         with self._locked():

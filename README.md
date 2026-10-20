@@ -353,6 +353,7 @@ engram replay --room auth-migration                # a topic's history, in order
 engram correct <id> "the new, correct version"     # replace an outdated memory (old one kept as history)
 engram history <id>                                # what replaced what, when and why
 engram why <id>                                    # where it came from, what it rests on, what changed
+engram forget <id>                                # delete a memory for good (shows what changes; add --yes)
 engram export backup.json.gz                       # back up everything to one file
 engram import backup.json.gz                       # restore it (checked first; safe to repeat)
 
@@ -420,6 +421,13 @@ engram supersede <old-id> --undo                 # make <old-id> current again
 engram history <id>                              # status and full replacement history
 engram correct <id> "text" --source primary --ref "cite" --based-on <evidence-id>
 ```
+
+### Deleting
+```bash
+engram forget <id>                                     # show what deleting it would change
+engram forget <id> --yes                               # delete it, its search entries and every link to it
+```
+Forgetting is for things that should never have been saved. A memory it replaced becomes current again, memories that rested on it lose that evidence (`engram check` lists any left with nothing behind them), and earlier exports still contain it. To change a memory without losing its history, use `engram correct` instead.
 
 ### Evidence and explanations
 ```bash
