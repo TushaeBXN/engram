@@ -14,6 +14,9 @@ It is built to stay out of the way:
 * short messages and slash commands are skipped;
 * wings in ``recall_exclude_wings`` (default: the reference ``library``) are
   never shown;
+* project-aware: memories from the project you're working in (Claude Code
+  sends its folder) come first; other projects' memories must clear the
+  higher ``recall_other_min_relevance`` bar;
 * any error means no output: the hook never blocks or breaks a prompt.
 
 Each run is logged (time, counts, milliseconds; not the prompt text) to
@@ -35,6 +38,49 @@ HEADER = ("[Engram memory: notes from earlier sessions that may be relevant. Use
 MIN_PROMPT_CHARS = 12
 SNIPPET_CHARS = 400
 SESSION_TTL_DAYS = 7
+
+
+NEUTRAL_WINGS = ("default",)  # memories saved before project wings existed
+
+
+def _slug(name: str) -> str:
+    import re
+    return re.sub(r"[^a-z0-9._-]+", "-", name.lower()).strip("-.")[:60]
+
+
+def project_wing(cwd: Optional[str], cfg: Optional[dict] = None) -> Optional[str]:
+    """The wing for work in folder *cwd*: an explicit ``projects`` mapping in the
+    config ({"~/code/app": "myapp"}, longest match wins), else the git
+    repository's folder name, else the folder's own name. None for the home
+    folder, the filesystem root, or no folder."""
+    if not cwd:
+        return None
+    if cfg is None:
+        from engram.config import load_config
+        cfg = load_config()
+    try:
+        path = Path(cwd).expanduser().resolve()
+    except OSError:
+        return None
+    mapping = cfg.get("projects") or {}
+    best = None
+    for folder, wing in mapping.items():
+        try:
+            root = Path(folder).expanduser().resolve()
+        except OSError:
+            continue
+        if (path == root or root in path.parents) and (best is None or len(str(root)) > len(str(best[0]))):
+            best = (root, wing)
+    if best:
+        return _slug(str(best[1])) or None
+    if path == Path.home().resolve() or path == Path(path.anchor):
+        return None
+    for folder in (path, *path.parents):
+        if (folder / ".git").exists():
+            if folder == Path.home().resolve():
+                break
+            return _slug(folder.name) or None
+    return _slug(path.name) or None
 
 
 def _cfg_value(cfg: dict, key: str, default):
@@ -84,12 +130,23 @@ def _log(entry: dict) -> None:
         pass
 
 
-def select(results: list[dict], cfg: dict, seen: set = frozenset()) -> list[dict]:
-    """The results worth showing: relevant, not excluded, not already shown."""
+def select(results: list[dict], cfg: dict, seen: set = frozenset(),
+           project: Optional[str] = None) -> list[dict]:
+    """The results worth showing: relevant, not excluded, not already shown.
+
+    With a *project*, its memories (and neutral "default" ones) need
+    ``recall_min_relevance``; other projects' need ``recall_other_min_relevance``.
+    """
     min_rel = float(_cfg_value(cfg, "recall_min_relevance", 0.35))
+    other_rel = float(_cfg_value(cfg, "recall_other_min_relevance", 0.55))
     limit = int(_cfg_value(cfg, "recall_max", 3))
     excluded = set(_cfg_value(cfg, "recall_exclude_wings", ["library"]))
-    relevant = {r["id"] for r in results if r.get("semantic_score", 0.0) >= min_rel}
+
+    def bar(r: dict) -> float:
+        wing = (r.get("metadata") or {}).get("wing")
+        return min_rel if project is None or wing == project or wing in NEUTRAL_WINGS else other_rel
+
+    relevant = {r["id"] for r in results if r.get("semantic_score", 0.0) >= bar(r)}
     picked = []
     for r in results:
         meta = r.get("metadata") or {}
@@ -124,7 +181,7 @@ def format_note(picked: list[dict]) -> str:
 
 
 def recall(prompt: str, session_id: str = "", searcher=None, cfg: Optional[dict] = None,
-           remember: bool = True) -> str:
+           remember: bool = True, cwd: Optional[str] = None) -> str:
     """The note to add for *prompt* ('' when nothing relevant)."""
     from engram.config import load_config
 
@@ -140,10 +197,15 @@ def recall(prompt: str, session_id: str = "", searcher=None, cfg: Optional[dict]
         from engram.searcher import Searcher
         searcher = Searcher(backend_from_config(cfg), Chateau(), cfg)
     limit = int(_cfg_value(cfg, "recall_max", 3))
-    results = searcher.search(prompt[:2000], n=limit * 4,
-                              rerank=bool(_cfg_value(cfg, "recall_rerank", False)))
+    rerank = bool(_cfg_value(cfg, "recall_rerank", False))
+    project = project_wing(cwd, cfg)
+    results = []
+    if project:  # the project's own memories first, so other projects can't crowd them out
+        results = searcher.search(prompt[:2000], n=limit * 4, wing=project, rerank=rerank)
+    have = {r["id"] for r in results}
+    results += [r for r in searcher.search(prompt[:2000], n=limit * 4, rerank=rerank) if r["id"] not in have]
     seen = _seen(session_id) if remember else set()
-    picked = select(results, cfg, seen)
+    picked = select(results, cfg, seen, project)
     if remember and picked:
         _remember_seen(session_id, seen | {r["id"] for r in picked})
     return format_note(picked) if picked else ""
@@ -155,7 +217,8 @@ def main() -> None:
     shown = 0
     try:
         payload = json.loads(sys.stdin.read() or "{}")
-        note = recall(payload.get("prompt", ""), session_id=payload.get("session_id", ""))
+        note = recall(payload.get("prompt", ""), session_id=payload.get("session_id", ""),
+                      cwd=payload.get("cwd") or None)
         if note:
             shown = note.count("\n- ")
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit",

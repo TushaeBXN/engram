@@ -1,4 +1,5 @@
 # Engram
+<!-- mcp-name: io.github.TushaeBXN/engram -->
 <img width="1408" height="768" alt="Gemini_Generated_Image_9nr9z59nr9z59nr9" src="https://github.com/user-attachments/assets/e04422f2-1974-48c2-8568-238bc2641bdf" />
 
 > **Your AI forgets everything when the chat ends. Engram helps it remember.**
@@ -101,6 +102,7 @@ engram install-hooks --apply      # then restart Claude Code
 This adds three Claude Code hooks to `~/.claude/settings.json` (your existing settings are kept, with a backup):
 
 - **Auto-recall.** Each time you send Claude a message, Engram searches your memory first. If something clearly relevant turns up, Claude gets a short note with up to 3 memories before it answers, current versions first and outdated ones labelled. You ask *"why did we drop Passport?"* in a brand-new chat, and Claude already knows. Nothing is added when nothing is relevant, a memory isn't repeated within a session, and it takes about a second.
+- **Project-aware.** Memories are filed under the project you're working in (the git repo or folder name), and recall shows that project's memories first; other projects' notes only appear when they match very closely.
 - **Auto-save.** Every file Claude edits is saved.
 - **Save before compacting.** The conversation is saved before Claude Code compacts it.
 
@@ -377,6 +379,8 @@ Everything works out of the box. If you want to tweak things, settings live in `
 | `recall` | `true` | Auto-recall in Claude Code (needs `engram install-hooks`); `false` turns it off |
 | `recall_max` / `recall_min_relevance` | `3` / `0.35` | At most this many memories per message, and how closely they must match (0 to 1) |
 | `recall_exclude_wings` | `["library"]` | Wings auto-recall never shows |
+| `recall_other_min_relevance` | `0.55` | How closely another project's memories must match to be shown |
+| `projects` | `{}` | Map folders to wings when the folder name isn't what you want, e.g. `{"~/code/app": "billing"}` |
 | `keyword_search` | `true` | Exact-word index searched alongside meaning (SQLite, no download), built from your existing memories the first time it runs |
 | `vector_backend` | `chromadb` | Search engine: `chromadb`, `faiss` or `sqlitevec` (no compiled parts) |
 | `hybrid_weight` | `0.3` | Boost for results sharing your exact words; `0` turns it off |

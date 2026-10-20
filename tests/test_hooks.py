@@ -212,4 +212,33 @@ def test_install_hooks_copies_executable_scripts(tmp_path):
         assert os.access(dest / name, os.X_OK)
     snippet = json.loads(result.output[result.output.index("{"):])
     assert snippet["hooks"]["PostToolUse"][0]["matcher"] == "Write|Edit|MultiEdit"
-    assert snippet["hooks"]["PreCompact"][0]["hooks"][0]["command"] == str(dest / "engram_precompact_hook.sh")
+    command = snippet["hooks"]["PreCompact"][0]["hooks"][0]["command"]
+    assert command.startswith("ENGRAM_PYTHON=") and command.endswith(str(dest / "engram_precompact_hook.sh"))
+
+
+def test_hooks_work_without_engram_on_path(tmp_path):
+    """install-hooks sets ENGRAM_PYTHON, so the hooks don't need `engram` on PATH."""
+    home = tmp_path / "home"
+    env = {"HOME": str(home), "PATH": "/usr/bin:/bin", "ENGRAM_VECTOR_BACKEND": "sqlitevec",
+           "ENGRAM_PYTHON": sys.executable}
+    project = tmp_path / "myproj"
+    (project / ".git").mkdir(parents=True)
+    note = project / "notes.md"
+    note.write_text("We pinned the API client to v2 because v3 drops pagination.")
+    payload = {"hook_event_name": "PostToolUse", "tool_name": "Write", "cwd": str(project),
+               "tool_input": {"file_path": str(note)}}
+    assert run_hook("engram_save_hook.sh", payload, env).returncode == 0
+    files = drawers(home / ".engram", "file-*.json")
+    assert len(files) == 1 and files[0].relative_to(home / ".engram" / "chateau").parts[0] == "myproj"
+
+
+def test_explicit_wing_still_wins(tmp_path):
+    home = tmp_path / "home"
+    env = {"HOME": str(home), "PATH": "/usr/bin:/bin", "ENGRAM_VECTOR_BACKEND": "sqlitevec",
+           "ENGRAM_PYTHON": sys.executable, "ENGRAM_WING": "work"}
+    note = tmp_path / "n.md"
+    note.write_text("Deploys happen on Tuesdays after the standup meeting.")
+    payload = {"tool_input": {"file_path": str(note)}, "cwd": str(tmp_path)}
+    assert run_hook("engram_save_hook.sh", payload, env).returncode == 0
+    files = drawers(home / ".engram", "file-*.json")
+    assert files[0].relative_to(home / ".engram" / "chateau").parts[0] == "work"

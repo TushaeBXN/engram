@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 # PyPI distribution name ("engram" on PyPI is an unrelated project).
 # The command, import name and project are all still "engram".
 name = "engram-chateau"
-version = "1.7.0"
+version = "1.7.1"
 description = "Small, private, verbatim AI memory: local MCP server, Claude Code hooks and semantic search."
 authors = [{name = "Tushae Thomas"}]
 license = "MIT"
@@ -57,6 +57,7 @@ all = ["faiss-cpu>=1.7.0", "sqlite-vec>=0.1.0", "matplotlib>=3.5.0", "networkx>=
 engram = "engram.cli:app"
 engram-mcp = "engram.mcp_server:run_server"
 engram-recall = "engram.recall:main"
+engram-chateau = "engram.mcp_server:run_server"   # what MCP registry clients run (`uvx engram-chateau`)
 
 [project.urls]
 Repository = "https://github.com/TushaeBXN/engram"

@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.7.1
+
+**Project-aware memory for Claude Code.**
+- Auto-save and pre-compact now file memories under the project you're
+  working in (the git repository's name, or the folder's), instead of one
+  `default` wing, unless `ENGRAM_WING` is set. A `projects` setting maps
+  folders to wings by hand.
+- Auto-recall searches the current project first; memories from other
+  projects appear only above `recall_other_min_relevance` (0.55). Memories
+  already in `default` stay eligible. `engram recall --cwd FOLDER` previews it.
+
+**Fix: hooks that silently did nothing.** The auto-save and pre-compact hooks
+needed an `engram` command on PATH, which installs into a virtual environment
+don't provide, so they exited without saving. `engram install-hooks` now
+passes the Python that has Engram (`ENGRAM_PYTHON`), the hooks call
+`python -m engram`, and re-running `engram install-hooks --apply` replaces
+older Engram hook entries while keeping all your other hooks.
+
+**MCP registry metadata.** `server.json` and the `mcp-name` marker in the
+README let Engram be listed in the official MCP registry; a new
+`engram-chateau` command starts the MCP server for clients that run the
+package by name (`uvx engram-chateau`).
+
 ## 1.7.0
 
 **Auto-recall for Claude Code** (`engram.recall`). A `UserPromptSubmit` hook
