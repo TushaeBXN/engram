@@ -22,7 +22,7 @@ Add to `claude_desktop_config.json` (macOS: `~/Library/Application Support/Claud
 }
 ```
 
-## Available tools (27)
+## Available tools (31)
 
 | Tool | Description |
 |------|-------------|
@@ -53,3 +53,7 @@ Add to `claude_desktop_config.json` (macOS: `~/Library/Application Support/Claud
 | `engram_dispute` | Mark two memories as conflicting, undecided |
 | `engram_history` | A memory's status and replacement history |
 | `engram_recall` | The few memories clearly relevant to a message (auto-recall for any app) |
+| `engram_link` | Link memories: `based_on`, `derived_from`, `contradicts`, `supersedes` (`undo` to remove) |
+| `engram_source` | Record where a memory came from: user, primary, secondary, tool, inference |
+| `engram_why` | Explain a memory: source, evidence (and whether it changed), earlier versions, conflicts, ranking |
+| `engram_check` | What needs review: corrected evidence, unsupported inferences, open conflicts, broken links |

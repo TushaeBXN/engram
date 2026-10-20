@@ -11,11 +11,14 @@
   "wings":   [{"name": "myapp", "created": "…", "description": ""}],
   "rooms":   [{"name": "db", "wing": "myapp", "created": "…", "description": ""}],
   "drawers": [{"id": "c6e0b7b4-…", "content": "…", "wing": "myapp", "room": "db", "hall": "facts",
-               "timestamp": "…", "pinned": false, "decay_weight": 1.0, "tags": [], "compressed": false}],
+               "timestamp": "…", "pinned": false, "decay_weight": 1.0, "tags": [], "compressed": false,
+               "source": "primary", "source_ref": "U.S. Const. art. I, § 2"}],
   "closets": [{"wing": "myapp", "room": "db", "hall": "facts", "content": "…"}],
   "tunnels": {"myapp": [{"room": "db", "source_wing": "myapp", "target_wing": "ops", "created": "…"}]},
   "lineage": [{"kind": "supersedes", "old": "file-05aa…", "new": "c6e0b7b4-…",
                "at": "…", "reason": "needed concurrent writers", "by": "cli"}],
+  "relations": [{"kind": "based_on", "from": "9d1f…", "to": "file-77c2…",
+                 "at": "…", "reason": "the text of Article I, Section 2", "by": "mcp"}],
   "provenance": [{"memory_id": "…", "source": "user", "confidence": 0.8, "…": "…"}],
   "knowledge_graph": [{"subject": "app", "predicate": "uses", "object": "PostgreSQL",
                        "valid_from": "2026-04-09", "valid_until": null, "confidence": 1.0, "source": "mcp"}],
@@ -28,8 +31,9 @@
 
 | Key | Contents |
 |---|---|
-| `drawers` | Every memory exactly as stored on disk, including fields a newer Engram may add. IDs and timestamps are kept, so lineage links and provenance still match after a restore. |
+| `drawers` | Every memory exactly as stored on disk, including fields a newer Engram may add (since 1.9, `source` and `source_ref`, written only when set). IDs and timestamps are kept, so lineage links and provenance still match after a restore. |
 | `lineage` | The correction ledger (`lineage.json`): `supersedes` links (`new` replaced `old`) and `disputes` links (two memories conflict, undecided). |
+| `relations` | The evidence ledger (`relations.json`, added in 1.9): `based_on` links (`to` is evidence for `from`) and `derived_from` links (`from` was inferred from `to`). Missing in older backups, which import fine. |
 | `wings`, `rooms`, `closets`, `tunnels` | The château's structure and short summaries. |
 | `provenance` | Provenance records, if any were made. |
 | `knowledge_graph` | Every triple, with its validity dates. Row IDs are not kept. |
@@ -48,6 +52,7 @@ The whole file is checked before anything is written. If any check fails, the im
 - No ID appears twice in the backup.
 - A drawer whose ID already exists must be identical, or the import needs `--overwrite`.
 - The merged lineage (what is stored plus what is imported) only links memories that exist, replaces each memory at most once, and has no cycles.
+- The merged evidence links only link memories that exist and never lead back to where they started.
 - Knowledge-graph rows have text subject, predicate and object.
 
 ## Re-running and merging

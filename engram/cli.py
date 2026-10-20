@@ -6,6 +6,7 @@ to the terminal uses Rich for tables, panels, and progress bars.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Optional
 
@@ -485,11 +486,21 @@ def cmd_correct(
     memory_id: str = typer.Argument(..., help="ID (or the first 8+ characters) of the outdated memory."),
     content: str = typer.Argument(..., help="The corrected, current information."),
     reason: str = typer.Option("", "--reason", help="Why it changed."),
+    source: str = typer.Option("", "--source", help="Where the correction came from: user, primary, "
+                               "secondary, tool or inference (default: same as the old memory)."),
+    source_ref: str = typer.Option("", "--ref", help="Citation or URL for the correction."),
+    based_on: Optional[list[str]] = typer.Option(None, "--based-on", help="ID of a memory that supports "
+                                                 "the correction (repeatable)."),
 ):
     """Save a correction that replaces an outdated memory (the old one is kept as history)."""
     from engram.lineage import correct_memory
+    from engram.relations import attach_evidence, check_source, resolve_evidence
     palace = _palace()
-    out = _lineage_call(correct_memory, palace, _backend(), memory_id, content, reason=reason, by="cli")
+    evidence = _lineage_call(resolve_evidence, palace, based_on)
+    out = _lineage_call(correct_memory, palace, _backend(), memory_id, content, reason=reason, by="cli",
+                        source=_lineage_call(check_source, source), source_ref=source_ref)
+    if evidence:
+        attach_evidence(palace, out["new"]["id"], evidence, by="cli")
     if out["created"]:
         console.print(f"[green]✓[/green] Saved {short_id(out['new']['id'])}, replacing {short_id(out['old']['id'])}.")
     else:
@@ -563,6 +574,166 @@ def cmd_history(memory_id: str = typer.Argument(..., help="ID (or first 8+ chara
 
 
 # ---------------------------------------------------------------------------
+# Evidence and explanations (engram.relations)
+# ---------------------------------------------------------------------------
+
+@app.command("link")
+def cmd_link(
+    memory_id: str = typer.Argument(..., help="ID (or first 8+ characters) of a memory."),
+    relation: str = typer.Argument(..., help="based_on, derived_from, contradicts or supersedes."),
+    target_id: str = typer.Argument(..., help="ID of the other memory."),
+    reason: str = typer.Option("", "--reason", help="Why they are linked."),
+    undo: bool = typer.Option(False, "--undo", help="Remove this link."),
+):
+    """Link two memories: A based_on B (B is evidence for A), A derived_from B, A contradicts B, A supersedes B."""
+    from engram.relations import link_memories
+    out = _lineage_call(link_memories, _palace(), memory_id, relation, target_id, reason=reason, by="cli",
+                        undo=undo)
+    a, b = short_id(out["memory"]["id"]), short_id(out["target"]["id"])
+    if undo:
+        console.print(f"[green]✓[/green] Removed {a} {relation} {b}." if out["removed"]
+                      else f"There was no {a} {relation} {b} link; nothing changed.")
+    else:
+        verb = "Linked" if out["created"] else "Already linked"
+        console.print(f"[green]✓[/green] {verb}: {a} {relation} {b}.")
+
+
+@app.command("source")
+def cmd_source(
+    memory_id: str = typer.Argument(..., help="ID (or first 8+ characters) of a memory."),
+    kind: str = typer.Argument(..., help="user, primary, secondary, tool or inference."),
+    ref: str = typer.Option("", "--ref", help="Citation, URL or document it came from."),
+):
+    """Record where a memory came from."""
+    from engram.relations import SOURCE_LABELS, set_source
+    out = _lineage_call(set_source, _palace(), memory_id, kind, ref)
+    console.print(f"[green]✓[/green] {short_id(out['memory']['id'])}: {SOURCE_LABELS[kind]}"
+                  + (f" ({out['source_ref']})" if out["source_ref"] else ""), highlight=False)
+
+
+def _source_text(item: dict) -> str:
+    from engram.relations import SOURCE_LABELS
+    label = SOURCE_LABELS.get(item.get("source") or "", "source not recorded")
+    return label + (f", {item['source_ref']}" if item.get("source_ref") else "")
+
+
+def _status_text(item: dict) -> str:
+    if item.get("missing"):
+        return "[red]missing[/red]"
+    if item.get("status") == "superseded":
+        return f"[yellow]OUTDATED → {short_id(item['current_id'])}[/yellow]"
+    return "[red]disputed[/red]" if item.get("status") == "disputed" else ""
+
+
+def _print_evidence(items: list[dict], indent: int = 2) -> None:
+    from rich.markup import escape
+    pad = " " * indent
+    for ev in items:
+        if ev.get("missing"):
+            console.print(f"{pad}{ev['relation']} {short_id(ev['id'])}  [red]missing[/red]")
+            continue
+        console.print(f"{pad}{ev['relation']} [bold]{short_id(ev['id'])}[/bold]  {ev['timestamp'][:10]}  "
+                      f"[dim]{escape(_source_text(ev))}[/dim]  {_status_text(ev)}", highlight=False)
+        console.print(f"{pad}  {escape(ev['text'][:160])}", highlight=False)
+        if ev.get("reason"):
+            console.print(f"{pad}  [dim]why linked: {escape(ev['reason'])}[/dim]")
+        _print_evidence(ev.get("evidence") or [], indent + 4)
+
+
+@app.command("why")
+def cmd_why(
+    memory_id: str = typer.Argument(..., help="ID (or first 8+ characters) of a memory."),
+    query: Optional[str] = typer.Option(None, "--query", "-q", help="The question it was found for: "
+                                        "shows why search ranked it."),
+    as_json: bool = typer.Option(False, "--json", help="Print the full explanation as JSON."),
+):
+    """Explain a memory: source, date, evidence, earlier versions, conflicts and concerns."""
+    from rich.markup import escape
+
+    from engram.relations import explain
+    palace = _palace()
+    out = _lineage_call(explain, palace, memory_id, query=query, searcher=_searcher(palace) if query else None)
+    if as_json:
+        print(json.dumps(out, indent=2, ensure_ascii=False))
+        return
+    m = out["memory"]
+    claim = {"direct": "recorded directly", "supported": "a conclusion resting on evidence",
+             "inference": "an inference"}[out["claim"]]
+    console.print(f"[bold]{m['id']}[/bold]  {escape(m['wing'] + '/' + m['room'])}  {m['timestamp'][:10]}  "
+                  f"{_status_text(m)}", highlight=False)
+    console.print(f"  {escape(m['text'][:400])}", highlight=False)
+    console.print(f"  [dim]Source:[/dim] {escape(_source_text(m))}.  [dim]Type:[/dim] {claim}.", highlight=False)
+    if out.get("relevance"):
+        r = out["relevance"]
+        if r.get("rank"):
+            parts = ", ".join(f"{k.replace('_', ' ')} {r[k]}" for k in
+                              ("semantic_score", "keyword_overlap", "recency_boost", "temporal_closeness",
+                               "rerank_score") if k in r)
+            console.print(f"  [dim]For “{escape(r['query'])}”:[/dim] result {r['rank']} of {r['of']} "
+                          f"(score {r.get('final_score')}: {parts})", highlight=False)
+        if r.get("note"):
+            console.print(f"  [dim]{escape(r['note'])}[/dim]")
+    console.print("\n[bold]Evidence[/bold]")
+    if out["evidence"]:
+        _print_evidence(out["evidence"])
+    else:
+        console.print("  [dim]None recorded.[/dim]")
+    if out["history"]:
+        console.print("\n[bold]Earlier versions[/bold] (newest first)")
+        for h in out["history"]:
+            why = f" — {escape(h['reason'])}" if h.get("reason") else ""
+            console.print(f"  {h['replaced_at'][:10]}  {short_id(h['id'])} replaced{why}")
+            if not h.get("missing"):
+                console.print(f"    [dim]was:[/dim] {escape(h['text'][:160])}", highlight=False)
+            _print_evidence(h.get("evidence") or [], 4)
+    if out["supports"]:
+        console.print("\n[bold]Memories that rest on this one[/bold]")
+        for s in out["supports"]:
+            console.print(f"  {short_id(s['id'])} ({s['relation']})  {escape(s.get('text', '')[:120])}", highlight=False)
+    if out["conflicts"]:
+        console.print("\n[bold]Conflicts with[/bold]")
+        for c in out["conflicts"]:
+            console.print(f"  {short_id(c['id'])}  {escape(c.get('text', '')[:120])}", highlight=False)
+    if out["concerns"]:
+        console.print("\n[bold yellow]Needs review[/bold yellow]")
+        for note in out["concerns"]:
+            console.print(f"  • {escape(note)}", highlight=False)
+
+
+@app.command("check")
+def cmd_check(as_json: bool = typer.Option(False, "--json", help="Print the report as JSON.")):
+    """Find conclusions whose evidence changed, unsupported inferences, open conflicts and broken links."""
+    from rich.markup import escape
+
+    from engram.relations import check
+    report = check(_palace())
+    if as_json:
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+        return
+    if report["ok"]:
+        console.print("[green]✓[/green] Nothing needs review.")
+        return
+    for item in report["stale_support"]:
+        m, ev = item["memory"], item["evidence"]
+        what = (f"was corrected (now {short_id(ev['current_id'])})" if item["problem"] == "superseded"
+                else "is disputed")
+        console.print(f"[yellow]Evidence changed[/yellow]  {short_id(m['id'])} rests on {short_id(ev['id'])}, "
+                      f"which {what}.", highlight=False)
+        console.print(f"  [dim]{escape(m['text'][:120])}[/dim]", highlight=False)
+    for m in report["unsupported_inferences"]:
+        console.print(f"[yellow]No evidence[/yellow]  {short_id(m['id'])} is an inference with nothing linked "
+                      "as evidence.", highlight=False)
+        console.print(f"  [dim]{escape(m['text'][:120])}[/dim]", highlight=False)
+    for c in report["unresolved_conflicts"]:
+        console.print(f"[yellow]Undecided[/yellow]  {short_id(c['a']['id'])} and {short_id(c['b']['id'])} "
+                      f"conflict (since {c['since'][:10]}).", highlight=False)
+    for lk in report["broken_links"]:
+        console.print(f"[red]Broken link[/red]  {lk['kind']} refers to missing memory "
+                      f"{', '.join(short_id(x) for x in lk['missing'])}.", highlight=False)
+    console.print("\n[dim]Use `engram why <id>` for details. Nothing was changed.[/dim]")
+
+
+# ---------------------------------------------------------------------------
 # Backup and restore (engram.backup)
 # ---------------------------------------------------------------------------
 
@@ -578,7 +749,8 @@ def cmd_export(dest: str = typer.Argument(..., help="Backup file to write (.json
     from engram.backup import export_backup
     counts = export_backup(Path(dest), _palace(), **_backup_paths())
     console.print(f"[green]✓[/green] Backed up {_n(counts['drawers'], 'memory', 'memories')}, "
-                  f"{_n(counts['lineage_links'], 'correction')} and "
+                  f"{_n(counts['lineage_links'], 'correction')}, "
+                  f"{_n(counts['evidence_links'], 'evidence link')} and "
                   f"{_n(counts['kg_triples'], 'knowledge-graph fact')} to {dest}")
 
 
@@ -607,7 +779,8 @@ def cmd_import(
     prefix = "Would add" if dry_run else "Added"
     console.print(f"[green]✓[/green] {prefix} {_n(report['drawers_added'], 'memory', 'memories')} "
                   f"({report['drawers_skipped']} already present), "
-                  f"{_n(report['lineage_links_added'], 'correction')}"
+                  f"{_n(report['lineage_links_added'], 'correction')}, "
+                  f"{_n(report['evidence_links_added'], 'evidence link')}"
                   + ("" if dry_run else f", {_n(report['kg_triples_added'], 'knowledge-graph fact')}") + ".")
 
 # ---------------------------------------------------------------------------

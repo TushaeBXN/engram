@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.9.0
+
+**Memories can explain themselves.**
+- **Evidence links.** `engram link A based_on B` (B is evidence for A) and
+  `A derived_from B` (A was inferred from B), stored in
+  `chateau/relations.json`. `contradicts` and `supersedes` (or `updates`)
+  use the existing correction ledger, so there is one vocabulary for every
+  relationship. Links are checked: no missing memories, no evidence that
+  leads back to itself, and repeating a link changes nothing.
+- **Sources.** Every memory can say where it came from: `user`, `primary`,
+  `secondary`, `tool` or `inference`, plus a citation or URL
+  (`engram source`, or `source`/`source_ref` when saving). Older memories
+  show "not recorded"; nothing is guessed. A correction keeps the old
+  memory's source unless told otherwise.
+- **`engram why <id>`** explains a memory: source and date, record or
+  inference, the evidence tree (and whether any of it was since corrected or
+  disputed), earlier versions with the evidence *they* rested on, what rests
+  on this memory, conflicts, and with `--query` its rank and score parts.
+- **`engram check`** lists what needs review: conclusions whose evidence was
+  corrected or disputed, inferences with no evidence, unresolved conflicts,
+  broken links. It never changes anything; an outdated position keeps the
+  evidence it had.
+- MCP: new tools `engram_link`, `engram_source`, `engram_why`, `engram_check`
+  (31 tools); `engram_add_memory` takes `source`, `source_ref`, `based_on`
+  and `derived_from`, and `engram_correct` takes `source` and `based_on`
+  (all checked before anything is saved). The connect instructions tell the
+  AI to record sources and evidence and to call `engram_why` before relying
+  on a conclusion.
+- Backups carry sources and evidence links (`relations`; backups from
+  earlier versions import unchanged). Drawers without a source are written
+  exactly as before, so older Engram versions read them unchanged.
+
 ## 1.8.0
 
 **Engram for any AI app, not just Claude Code.**
