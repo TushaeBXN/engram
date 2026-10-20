@@ -177,7 +177,7 @@ def test_correction_keeps_the_source_unless_told_otherwise(engram_home, tmp_path
 def test_add_memory_refuses_bad_evidence_before_saving(server):
     with pytest.raises(RuntimeError, match="no memory"):
         call(server, "engram_add_memory", content="orphan conclusion", based_on=["missing-id"])
-    with pytest.raises(RuntimeError, match="unknown source"):
+    with pytest.raises(RuntimeError, match="'source' must be one of"):
         call(server, "engram_add_memory", content="orphan conclusion", source="vibes")
     assert list(server.palace.iter_drawers()) == []
 

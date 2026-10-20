@@ -39,9 +39,10 @@ def _palace():
 def _backend(cfg=None):
     from engram.backends import BackendUnavailableError, backend_from_config
     c = cfg or load_config()
+    from engram.embedding import EmbeddingConfigError
     try:
         return backend_from_config(c)
-    except BackendUnavailableError as exc:
+    except (BackendUnavailableError, EmbeddingConfigError) as exc:
         console.print(str(exc), style="red", markup=False)
         raise typer.Exit(1)
 
@@ -1324,6 +1325,61 @@ def cmd_connect(
         else:
             console.print(f"[green]✓[/green] {escape(app_.name)}: Engram {status} in {escape(str(app_.path))} "
                           f"(backup: {escape(app_.path.name)}.bak). {escape(app_.restart)}.")
+
+
+@app.command("reindex")
+def cmd_reindex(wing: Optional[str] = typer.Option(None, "--wing", help="Only this wing.")):
+    """Rebuild the search index from your memories (after changing the embedding model)."""
+    from engram.backup import reindex
+    from engram.embedding import EmbeddingConfigError
+    palace, backend = _palace(), _backend()
+    drawers = [d.to_dict() for d in palace.iter_drawers(wing=wing)]
+    if not drawers:
+        console.print("No memories to index.")
+        return
+    cfg = load_config()
+    server = getattr(backend, "embedding_server", None) or getattr(getattr(backend, "inner", None), "embedding_server", None)
+    console.print(f"Indexing {_n(len(drawers), 'memory', 'memories')}"
+                  + (f" with {server['model']} at {server['url']}" if server else " with the built-in model") + " …")
+    try:
+        chunks = reindex(backend, drawers, bool(cfg.get("preference_summaries", True)))
+    except EmbeddingConfigError as exc:
+        console.print(f"[red]Error:[/red] {exc}", highlight=False)
+        raise typer.Exit(1)
+    console.print(f"[green]✓[/green] Indexed {_n(chunks, 'chunk')}. Your memories themselves were not changed.")
+
+
+@app.command("serve")
+def cmd_serve(
+    host: str = typer.Option("127.0.0.1", "--host", help="Address to listen on. Anything but localhost needs a token."),
+    port: int = typer.Option(7742, "--port", help="Port to listen on."),
+    token: bool = typer.Option(False, "--token", help="Require a token even on localhost (created on first use)."),
+    allow_host: Optional[list[str]] = typer.Option(None, "--allow-host", help="Extra Host name to accept on a "
+                                                   "tokenless localhost server (e.g. host.docker.internal)."),
+):
+    """Run a local web API for apps that don't speak MCP (Open WebUI, n8n, scripts)."""
+    from engram import server as srv
+    secret = None
+    if token or not srv.is_loopback(host):
+        secret = srv.load_or_create_token()
+    try:
+        httpd = srv.make_server(host, port, secret, extra_hosts=tuple(allow_host or ()))
+    except (ValueError, OSError) as exc:
+        console.print(f"[red]Error:[/red] {exc}", highlight=False)
+        raise typer.Exit(1)
+    base = f"http://{host if ':' not in host else '[' + host + ']'}:{port}"
+    console.print(f"[green]✓[/green] Engram is serving at {base}  [dim](Ctrl+C to stop)[/dim]")
+    console.print(f"  Tools:    {base}/openapi.json   (point Open WebUI or n8n here)")
+    if secret:
+        console.print(f"  Token:    send  Authorization: Bearer <token>   — it is in {srv.token_path()}", highlight=False)
+    else:
+        console.print("  No token: only apps on this computer can reach it. Use --token to require one.")
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        console.print("\n[dim]Engram server stopped.[/dim]")
+    finally:
+        httpd.server_close()
 
 
 @app.command("recall")

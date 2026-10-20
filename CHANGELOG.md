@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.10.0
+
+**Engram for apps without MCP, other languages, and clearer errors.**
+- **`engram serve`**: a local web API (`GET /openapi.json`, `POST /v1/tools/<name>`)
+  with the same tools and rules as MCP, for Open WebUI, n8n and scripts.
+  Strict by default: localhost only; without a token it refuses requests
+  with a foreign `Origin`, a cross-site `Sec-Fetch-Site`, a non-localhost
+  `Host` (DNS rebinding) or proxy headers; JSON-only POSTs, 1 MB bodies, no
+  CORS headers, internal errors name only the error class. Listening on any
+  other address always requires a token (`~/.engram/server/token`, mode
+  0600, created on first use, its contents never printed, compared in
+  constant time). Uses only the standard library.
+- **Argument checks for every tool** (MCP and web): a wrong type, a value
+  outside the allowed list, a missing required parameter or a misspelt one
+  now returns an error that names the parameter (MCP code `-32602`) instead
+  of a Python traceback. `"5"` for a number and `"false"` for a boolean are
+  converted.
+- **Embedding server.** Set `embedding_api_url` and `embedding_api_model`
+  to use LM Studio, Ollama, llama.cpp, vLLM or any `/v1/embeddings` server
+  (for other languages or larger models), then run `engram reindex`. The
+  server must be on this computer or your network unless
+  `embedding_api_allow_remote` is true, since memory text is sent to it.
+  Each server and model gets its own index (your default index and your
+  memories are never touched), and a server that is down is an error, not
+  "no results". Works with the `chromadb` backend.
+- `engram reindex` rebuilds the search index from the stored memories.
+- `skills/engram/SKILL.md`: an agent skill (`npx skills add TushaeBXN/engram`)
+  teaching recall, saving, correcting and explaining.
+- Fix: the `sqlitevec` backend and the knowledge graph can be used from the
+  web server's worker threads.
+
 ## 1.9.0
 
 **Memories can explain themselves.**

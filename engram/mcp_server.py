@@ -51,6 +51,7 @@ import traceback
 from typing import Any
 
 from engram import __version__
+from engram.validate import ArgumentError
 
 # ---------------------------------------------------------------------------
 # MCP protocol helpers (minimal stdio JSON-RPC implementation)
@@ -488,6 +489,8 @@ TOOLS: list[dict] = [
     },
 ]
 
+TOOL_SCHEMAS: dict[str, dict] = {t["name"]: t["inputSchema"] for t in TOOLS}
+
 
 # ---------------------------------------------------------------------------
 # Tool dispatch
@@ -514,10 +517,11 @@ class EngramMCPServer:
     # ------------------------------------------------------------------
 
     def dispatch(self, name: str, args: dict) -> Any:
+        from engram.validate import validate_arguments
         handler = getattr(self, f"_tool_{name}", None)
         if handler is None:
             raise ValueError(f"Unknown tool: {name}")
-        return handler(**args)
+        return handler(**validate_arguments(TOOL_SCHEMAS[name], args))
 
     # ------------------------------------------------------------------
     # Tool implementations
@@ -745,6 +749,8 @@ def _handle_message(server: EngramMCPServer, msg: dict) -> dict | None:
             return _result(id_, {
                 "content": [{"type": "text", "text": json.dumps(result, indent=2, default=str)}]
             })
+        except ArgumentError as exc:
+            return _error(id_, -32602, f"Invalid arguments for {tool_name}: {exc}")
         except Exception as exc:
             return _error(id_, -32603, f"{type(exc).__name__}: {exc}")
 

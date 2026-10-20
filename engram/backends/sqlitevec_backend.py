@@ -51,7 +51,7 @@ class SqliteVecBackend(VectorBackend):
         self._embedder = _get_embedder()
         self._has_sqlite_vec = False
 
-        self._conn = sqlite3.connect(str(self._db_path))
+        self._conn = sqlite3.connect(str(self._db_path), check_same_thread=False)  # engram serve calls it from worker threads, one at a time
         self._conn.row_factory = sqlite3.Row
         self._try_load_sqlite_vec()
         self._create_tables()

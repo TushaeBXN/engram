@@ -68,8 +68,20 @@ def test_unknown_tool_returns_error(server):
 
 
 def test_bad_arguments_return_error_not_crash(server):
-    with pytest.raises(RuntimeError, match="TypeError"):
-        call(server, "engram_add_memory", nonsense=True)
+    with pytest.raises(RuntimeError, match="unknown parameter 'nonsense'"):
+        call(server, "engram_add_memory", content="x", nonsense=True)
+    with pytest.raises(RuntimeError, match="missing required parameter 'content'"):
+        call(server, "engram_add_memory")
+    with pytest.raises(RuntimeError, match="'n' must be a whole number"):
+        call(server, "engram_search", query="x", n="lots")
+    resp = _handle_message(server, {"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                                    "params": {"name": "engram_search", "arguments": {"query": "x", "n": []}}})
+    assert resp["error"]["code"] == -32602  # invalid params, not an internal error
+
+
+def test_harmless_argument_mistakes_are_converted(server):
+    call(server, "engram_add_memory", content="Tabs, not spaces, in this repo.", pinned="true")
+    assert call(server, "engram_search", query="tabs or spaces", n="3")
 
 
 # ---------------------------------------------------------------------------
