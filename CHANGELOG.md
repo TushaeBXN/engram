@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.10.2
+
+**A recalled correction now says what it replaced, and why.** Found by running a
+companion app through a live "I changed my coffee order" conversation: asked
+"what was my old order, and why did it change?", the recall note showed only
+the new order, so the model had to go and look the history up (and, in that
+run, got lost doing so). A recalled memory that replaced another now carries
+a short `(before, until <date>: <reason>: "<old text>")` tail, unless the old
+version is already listed in the same note. Costs about 30 tokens, and only
+for corrected memories.
+
 ## 1.10.1
 
 **Claims checked against the code; the gaps fixed.** `benchmarks/trust_eval.py`

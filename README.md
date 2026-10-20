@@ -116,7 +116,7 @@ engram install-hooks --apply      # then restart Claude Code
 
 `install-hooks` adds three Claude Code hooks to `~/.claude/settings.json` (your existing settings are kept, with a backup):
 
-- **Auto-recall.** Each time you send Claude a message, Engram searches your memory first. If something clearly relevant turns up, Claude gets a short note with up to 3 memories before it answers, current versions first and outdated ones labelled. You ask *"why did we drop Passport?"* in a brand-new chat, and Claude already knows. Nothing is added when nothing is relevant, a memory isn't repeated within a session, and it takes about a second once warm (the first message after your computer starts it can take several seconds while it loads).
+- **Auto-recall.** Each time you send Claude a message, Engram searches your memory first. If something clearly relevant turns up, Claude gets a short note with up to 3 memories before it answers, current versions first (with what they replaced and why) and outdated ones labelled. You ask *"why did we drop Passport?"* in a brand-new chat, and Claude already knows. Nothing is added when nothing is relevant, a memory isn't repeated within a session, and it takes about a second once warm (the first message after your computer starts it can take several seconds while it loads).
 - **Project-aware.** Memories are filed under the project you're working in (the git repo or folder name), and recall shows that project's memories first; other projects' notes only appear when they match very closely.
 - **Auto-save.** Every file Claude edits is saved.
 - **Save before compacting.** The conversation is saved before Claude Code compacts it.
