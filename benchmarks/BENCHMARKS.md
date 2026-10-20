@@ -2,21 +2,23 @@
 
 ## Target Performance
 
-These are goals; measured results are in the next section.
+Goals, and whether they have been measured. A goal that has not been measured is not a claim.
 
-| Benchmark         | Metric              | Target     | Notes                        |
-|-------------------|---------------------|------------|------------------------------|
-| LongMemEval       | Session recall R@5  | ≥ 0.95     | 500 questions, longmemeval_s |
-| LongMemEval       | Session recall R@10 | ≥ 0.97     | same run                     |
-| LoCoMo            | Session recall R@10 | ≥ 0.85     | 1,986 questions, locomo10    |
-| LoCoMo            | Session recall R@5  | ≥ 0.75     | same run                     |
-| ES compression    | Factual paragraphs  | ≥ 1.5×     | measured by char ratio       |
-| ES compression    | Code-heavy content  | ≥ 1.1×     | function signatures + bodies |
-| ES compression    | Mixed content       | ≥ 1.4×     | weighted average             |
-| Cold-start ctx    | L0 + L1 tokens      | ≤ 170      | measured with tiktoken       |
-| Search latency    | p99 (ChromaDB)      | < 200ms    | 100k drawer collection       |
-| Search latency    | p99 (FAISS)         | < 50ms     | 100k drawer collection       |
-| Mine throughput   | Files/sec           | ≥ 50       | average text file size       |
+| Benchmark         | Metric              | Target     | Status                                                         |
+|-------------------|---------------------|------------|----------------------------------------------------------------|
+| LongMemEval       | Session recall R@5  | ≥ 0.95     | Measured: 0.988 (below; not held-out)                          |
+| LongMemEval       | Session recall R@10 | ≥ 0.97     | Measured: 0.998                                                |
+| LoCoMo            | Session recall R@10 | ≥ 0.85     | Measured: 0.921                                                |
+| LoCoMo            | Session recall R@5  | ≥ 0.75     | Measured: 0.849                                                |
+| ES compression    | Factual paragraphs  | ≥ 1.5×     | Measured: 1.6× on sample text (`--compression-only`)           |
+| ES compression    | Code-heavy content  | ≥ 1.1×     | Measured: 1.1×                                                 |
+| ES compression    | Mixed content       | ≥ 1.4×     | Measured: 1.5×; short sentences only 1.15× ([TRUST.md](TRUST.md)) |
+| Cold-start ctx    | L0 + L1 tokens      | ≤ 170      | Measured 124 (estimated tokens); enforced by `l1_budget_tokens` since 1.10.1 ([TRUST.md](TRUST.md)) |
+| Search latency    | p99 (ChromaDB)      | < 200ms    | **Not measured**                                               |
+| Search latency    | p99 (FAISS)         | < 50ms     | **Not measured**                                               |
+| Mine throughput   | Files/sec           | ≥ 50       | **Not measured**                                               |
+
+Corrections, recall-note size, and crash safety are measured in [TRUST.md](TRUST.md).
 
 ## Measured results
 

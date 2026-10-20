@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Optional
 
 from engram.config import get_chateau_path
+from engram.fsio import atomic_write_text
 
 # ---------------------------------------------------------------------------
 # Hall types recognised by the château
@@ -265,7 +266,7 @@ class Chateau:
         wp = self.wing_path(name)
         wp.mkdir(parents=True, exist_ok=True)
         wing = Wing(name=name, description=description)
-        (wp / "wing.json").write_text(json.dumps(wing.to_dict(), indent=2))
+        atomic_write_text(wp / "wing.json", json.dumps(wing.to_dict(), indent=2))
         return wing
 
     def ensure_wing(self, name: str) -> Wing:
@@ -308,7 +309,7 @@ class Chateau:
         for hall in HALL_TYPES:
             (rp / hall).mkdir(exist_ok=True)
         room = Room(name=name, wing=wing, description=description)
-        (rp / "room.json").write_text(json.dumps(room.to_dict(), indent=2))
+        atomic_write_text(rp / "room.json", json.dumps(room.to_dict(), indent=2))
         return room
 
     def ensure_room(self, wing: str, name: str) -> Room:
@@ -336,7 +337,7 @@ class Chateau:
         self.ensure_room(drawer.wing, drawer.room)
         dest = self._drawer_file(drawer.wing, drawer.room, drawer.hall, drawer.id)
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(json.dumps(drawer.to_dict(), indent=2))
+        atomic_write_text(dest, json.dumps(drawer.to_dict(), indent=2))
         return dest
 
     def get_drawer(self, wing: str, room: str, hall: str, drawer_id: str) -> Optional[Drawer]:
@@ -370,6 +371,23 @@ class Chateau:
                             yield Drawer.from_dict(json.loads(jf.read_text()))
                         except (json.JSONDecodeError, TypeError, KeyError):
                             continue
+
+    def unreadable_files(self) -> list[Path]:
+        """Drawer files that can't be read back, and leftovers of an interrupted write.
+
+        Reading skips a damaged file instead of failing, so without this a
+        damaged memory would just silently vanish from search and listings.
+        """
+        bad = []
+        for jf in sorted(self.path.glob("*/*/*/*.json")):
+            if jf.parts[-4] in RESERVED_DIRS:
+                continue
+            try:
+                Drawer.from_dict(json.loads(jf.read_text()))
+            except (OSError, ValueError, TypeError, KeyError):
+                bad.append(jf)
+        bad.extend(sorted(self.path.glob("**/.*.tmp")))
+        return bad
 
     def delete_drawer(self, wing: str, room: str, hall: str, drawer_id: str) -> bool:
         p = self._drawer_file(wing, room, hall, drawer_id)
@@ -428,9 +446,7 @@ class Chateau:
         self.ensure_room(closet.wing, closet.room)
         hp = self.hall_path(closet.wing, closet.room, closet.hall)
         hp.mkdir(parents=True, exist_ok=True)
-        self.closet_path(closet.wing, closet.room, closet.hall).write_text(
-            closet.content
-        )
+        atomic_write_text(self.closet_path(closet.wing, closet.room, closet.hall), closet.content)
 
     def get_closet(self, wing: str, room: str, hall: str) -> Optional[Closet]:
         p = self.closet_path(wing, room, hall)
@@ -467,9 +483,7 @@ class Chateau:
         t = Tunnel(room=room, source_wing=source_wing, target_wing=target_wing)
         tunnels.append(t)
         self.ensure_wing(source_wing)
-        self._tunnels_path(source_wing).write_text(
-            json.dumps([x.to_dict() for x in tunnels], indent=2)
-        )
+        atomic_write_text(self._tunnels_path(source_wing), json.dumps([x.to_dict() for x in tunnels], indent=2))
         return t
 
     # ------------------------------------------------------------------

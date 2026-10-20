@@ -20,7 +20,7 @@ from engram.lineage import short_id
 
 app = typer.Typer(
     name="engram",
-    help="The AI memory layer that never forgets.",
+    help="Local, private long-term memory for AI.",
     add_completion=True,
     rich_markup_mode="rich",
 )

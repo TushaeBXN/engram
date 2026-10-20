@@ -116,7 +116,7 @@ engram install-hooks --apply      # then restart Claude Code
 
 `install-hooks` adds three Claude Code hooks to `~/.claude/settings.json` (your existing settings are kept, with a backup):
 
-- **Auto-recall.** Each time you send Claude a message, Engram searches your memory first. If something clearly relevant turns up, Claude gets a short note with up to 3 memories before it answers, current versions first and outdated ones labelled. You ask *"why did we drop Passport?"* in a brand-new chat, and Claude already knows. Nothing is added when nothing is relevant, a memory isn't repeated within a session, and it takes about a second.
+- **Auto-recall.** Each time you send Claude a message, Engram searches your memory first. If something clearly relevant turns up, Claude gets a short note with up to 3 memories before it answers, current versions first and outdated ones labelled. You ask *"why did we drop Passport?"* in a brand-new chat, and Claude already knows. Nothing is added when nothing is relevant, a memory isn't repeated within a session, and it takes about a second once warm (the first message after your computer starts it can take several seconds while it loads).
 - **Project-aware.** Memories are filed under the project you're working in (the git repo or folder name), and recall shows that project's memories first; other projects' notes only appear when they match very closely.
 - **Auto-save.** Every file Claude edits is saved.
 - **Save before compacting.** The conversation is saved before Claude Code compacts it.
@@ -172,7 +172,7 @@ Both put `engram` and `engram-mcp` on your PATH without touching your system Pyt
 - **🧠 It understands what you mean.** It finds *"we switched from Passport to Lucia"* when you ask about *"changing the auth library"*. It also matches exact names and numbers (`INV-20931`), and understands time: *"two weeks ago"*, *"in June"*, *"on May 8"*.
 - **💸 It's free to run.** It needs no LLM to save or search, so there are no per-message costs and nothing to rate-limit.
 - **🎯 It's accurate.** On the two standard tests of AI memory, it beats the best published no-LLM results ([numbers below](#how-good-is-it)).
-- **📖 You can read all of it.** About 8,400 lines of plain Python, MIT licensed. If you want to know exactly what happens to your data, you can.
+- **📖 You can read all of it.** About 10,000 lines of plain Python, MIT licensed. If you want to know exactly what happens to your data, you can.
 - **🔄 It knows when it's out of date.** When a decision changes, the new memory is marked as replacing the old one. Search gives you the current answer first, and the old one stays below it as history, with when and why it changed.
 - **🔑 It can hide secrets for you.** Turn on `redact_secrets` and API keys, tokens and passwords are blanked out before anything is written to disk.
 
@@ -200,7 +200,7 @@ You don't have to manage any of this; Engram sorts things as it saves them. When
 | **Recency** | Leans slightly toward newer memories; pinned ones never fade |
 | **Reranker** *(optional)* | A small local model re-reads the top 20 and puts the best one first |
 
-At the start of a session, Engram can also hand the AI a tiny "wake-up" note (who it is plus key facts, about 170 tokens), so it never starts completely cold.
+At the start of a session, Engram can also hand the AI a small "wake-up" note (who it is plus key facts: pinned ones first, then the newest, about 120 tokens by default), so it never starts completely cold.
 
 ---
 
@@ -271,14 +271,28 @@ Researchers test AI memory with two public benchmarks. Each gives the system lon
 | **[LongMemEval](https://github.com/xiaowu0162/LongMemEval)**: 500 questions, right conversation in the top 5 | **98.8%** | 98.4% |
 | **[LoCoMo](https://github.com/snap-research/locomo)**: 1,986 questions, answer's sessions in the top 10 | **92.1%** | 88.9% |
 
-In plain terms: ask Engram 500 questions about months of chat history, and for 494 of them the right conversation is in its top 5 results. It gets there with a small model that runs on a laptop, no LLM and no API.
+In plain terms: ask Engram 500 questions about months of chat history, and for 494 of them the right conversation is in its top 5 results. It gets there with a small model that runs on a laptop, no LLM and no API. These tests measure finding the right conversation. They don't measure whether corrections, evidence links or recall notes make an AI more accurate; [benchmarks/trust_eval.py](benchmarks/trust_eval.py) checks those, and the results are listed below.
+
+**Does it keep memory trustworthy?** Those tests don't cover corrections, the notes handed to a model, or crashes, so [`benchmarks/trust_eval.py`](benchmarks/TRUST.md) checks them. On its own (author-written, deliberately small) scenarios, in the current version:
+
+| | Result |
+|---|---|
+| After a fact changes, the current version comes first | 20 of 20 questions (4 of 20 with no correction history) |
+| Auto-recall note size vs. pasting every memory | 92 tokens vs. 5,134 |
+| Auto-recall note contains the answer | 17 of 20 (a plain top-5 search: 19 of 20) |
+| Auto-recall speaks up when nothing relevant is stored | 0 of 20 times |
+| Memory files left half-written after 40 forced crashes | 0 (10 before 1.10.1 fixed this) |
+| Corrections or links lost with 6 writers in parallel | 0 of 240 |
+
+Auto-recall trades some answers for silence and small notes; [the full table](benchmarks/TRUST.md), what it doesn't show, and how to run it yourself are there. Nothing here shows that it makes an AI more accurate end to end; that hasn't been tested.
 
 <details>
 <summary><b>The fine print</b></summary>
 
 - Both systems use the same small local embedding model (all-MiniLM-L6-v2).
 - Engram indexes the assistant's replies as well as yours; MemPalace's raw mode indexes only yours.
-- MemPalace tuned its LongMemEval hybrid on 50 questions and scored the other 450. Engram's settings were written as general rules, scored on all 500, then used unchanged on LoCoMo.
+- **These numbers are not held-out.** MemPalace tuned its LongMemEval hybrid on 50 questions and scored the other 450. Engram's boosts are fixed general rules, not tuned per question, but we chose which ones to ship by watching LongMemEval and LoCoMo scores from version to version (each step is in [BENCHMARKS.md](benchmarks/BENCHMARKS.md)), so some of the score is fitted to these two tests.
+- **The fairest like-for-like row is raw meaning search.** Engram scores 96.8% R@5 on LongMemEval and MemPalace's raw mode 96.6%, which is level. Read the table as "comparable", not "better".
 - One LongMemEval question is worth 0.2 points, so small differences are a question or two.
 - With an LLM reranker (which needs an API key), MemPalace reports 99%+. Engram doesn't offer that, by design.
 - Everything is reproducible from this repo. Full per-question-type results, earlier versions and the exact commands are in [benchmarks/BENCHMARKS.md](benchmarks/BENCHMARKS.md).
@@ -450,7 +464,7 @@ Everything works out of the box. If you want to tweak things, settings live in `
 | `redact_secrets` | `false` | Blank out API keys, tokens and passwords (`[REDACTED:…]`) before anything is saved |
 | `reranker` | `false` | Local reranker; turn on with `engram setup-reranker`. While off, nothing extra is downloaded |
 | `recall` | `true` | Auto-recall in Claude Code (needs `engram install-hooks`); `false` turns it off |
-| `recall_max` / `recall_min_relevance` | `3` / `0.35` | At most this many memories per message, and how closely they must match (0 to 1) |
+| `recall_max` / `recall_min_relevance` | `3` / `0.30` | At most this many memories per message, and how closely they must match (0 to 1) |
 | `recall_exclude_wings` | `["library"]` | Wings auto-recall never shows |
 | `recall_other_min_relevance` | `0.55` | How closely another project's memories must match to be shown |
 | `projects` | `{}` | Map folders to wings when the folder name isn't what you want, e.g. `{"~/code/app": "billing"}` |
@@ -460,6 +474,7 @@ Everything works out of the box. If you want to tweak things, settings live in `
 | `hybrid_weight` | `0.3` | Boost for results sharing your exact words; `0` turns it off |
 | `temporal_weight` | `0.4` | Boost for memories near a time the question names; `0` turns it off |
 | `preference_summaries` | `true` | Index a short summary of preferences and concerns mentioned in passing |
+| `l1_budget_tokens` | `120` | Size of the key-facts part of the wake-up note |
 | `rerank_top` | `20` | How many top results the reranker reorders |
 | `decay_factor` / `decay_max_days` | `0.005` / `90` | How much newer memories are favoured, and for how long |
 | `chateau_path` | `~/.engram/chateau` | Where memories are stored |
@@ -499,7 +514,7 @@ compress("The authentication module is a critical component that has a dependenc
 | Layer | Content | Size | Loaded |
 |---|---|---|---|
 | L0 | Identity: who the AI is | ~50 tokens | Always |
-| L1 | Key facts, in shorthand | ~120 tokens | Always |
+| L1 | Key facts, in shorthand | up to 120 tokens (`l1_budget_tokens`) | Always |
 | L2 | The current topic's memories | On demand | When the topic comes up |
 | L3 | Full search | On demand | When asked |
 
