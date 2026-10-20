@@ -1,6 +1,6 @@
 # Engram
 <!-- mcp-name: io.github.TushaeBXN/engram -->
-<img width="1408" height="768" alt="Gemini_Generated_Image_9nr9z59nr9z59nr9" src="https://github.com/user-attachments/assets/e04422f2-1974-48c2-8568-238bc2641bdf" />
+<img width="1024" height="558" alt="engram update image" src="https://github.com/user-attachments/assets/2afaa9df-0539-4837-94e7-e20b8840cc77" />
 
 > **Your AI forgets everything when the chat ends. Engram helps it remember.**
 > Free, private, runs on your own computer, and keeps every word exactly as you wrote it.
