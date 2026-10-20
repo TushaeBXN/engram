@@ -14,6 +14,8 @@ It is built to stay out of the way:
 * short messages and slash commands are skipped;
 * wings in ``recall_exclude_wings`` (default: the reference ``library``) are
   never shown;
+* a saved preference needs only ``recall_preference_min_relevance`` (0.20), because a question
+  asking for a choice rarely repeats the words of the preference it should find;
 * project-aware: memories from the project you're working in (Claude Code
   sends its folder) come first; other projects' memories must clear the
   higher ``recall_other_min_relevance`` bar;
@@ -135,16 +137,25 @@ def select(results: list[dict], cfg: dict, seen: set = frozenset(),
     """The results worth showing: relevant, not excluded, not already shown.
 
     With a *project*, its memories (and neutral "default" ones) need
-    ``recall_min_relevance``; other projects' need ``recall_other_min_relevance``.
+    ``recall_min_relevance`` (preferences: ``recall_preference_min_relevance``, lower);
+    other projects' need ``recall_other_min_relevance``.
     """
     min_rel = float(_cfg_value(cfg, "recall_min_relevance", 0.30))
     other_rel = float(_cfg_value(cfg, "recall_other_min_relevance", 0.55))
     limit = int(_cfg_value(cfg, "recall_max", 3))
     excluded = set(_cfg_value(cfg, "recall_exclude_wings", ["library"]))
 
+    pref_rel = float(_cfg_value(cfg, "recall_preference_min_relevance", 0.20))
+
     def bar(r: dict) -> float:
-        wing = (r.get("metadata") or {}).get("wing")
-        return min_rel if project is None or wing == project or wing in NEUTRAL_WINGS else other_rel
+        meta = r.get("metadata") or {}
+        wing = meta.get("wing")
+        if project is None or wing == project or wing in NEUTRAL_WINGS:
+            # A saved preference is there to be used when you ask for a choice ("where should I get
+            # pastries?" -> "favorite bakery"), and such a question rarely repeats its words, so it
+            # gets a lower bar than facts do.
+            return min(min_rel, pref_rel) if meta.get("hall") == "preferences" else min_rel
+        return other_rel
 
     relevant = {r["id"] for r in results if r.get("semantic_score", 0.0) >= bar(r)}
     picked = []

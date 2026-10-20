@@ -33,6 +33,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "recall": True,
     "recall_max": 3,
     "recall_min_relevance": 0.30,
+    "recall_preference_min_relevance": 0.20,  # saved preferences: a lower bar, see engram.recall
     "recall_other_min_relevance": 0.55,  # memories from a different project than the one open
     "recall_exclude_wings": ["library"],
     "recall_rerank": False,

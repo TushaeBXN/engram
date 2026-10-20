@@ -75,6 +75,22 @@ messy real-life change.
   folder order rather than by importance. Key facts are now pinned first, then newest, skipping
   corrected ones, within `l1_budget_tokens` (default 120).
 
+### 2b. Preferences: found when the question uses different words
+
+6 saved preferences (a favorite bakery, a coffee order, seat choice, diet, a running
+habit, editor settings), 9 questions that should bring one up, and 12 that shouldn't.
+
+| Bar | Preference found | False alarms (of 12) |
+|---|---|---|
+| Same as facts (0.30; before 1.10.3) | 2 / 9 | 1 |
+| **Preference bar 0.20 (default)** | **6 / 9** | **1** |
+
+The one false alarm either way is "where should I park downtown tomorrow?". The 3 still
+missed need reasoning, not wording ("we're taking clients to dinner" -> "vegetarian").
+A live test of the companion app found this: "I'm picking up pastries before work tomorrow"
+scores 0.205 against "favorite bakery … lemon scone", under the 0.30 bar. The cases were
+chosen while looking at that failure, so treat 6 / 9 as optimistic.
+
 ### 3. Reliability: kill the writer, run writers in parallel
 
 Writers save 240 KB memories, corrections and evidence links in a loop; each trial is
