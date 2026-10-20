@@ -17,7 +17,7 @@ def _start(engram_home, token=None, **kw):
     return httpd
 
 
-def _req(httpd, method, path, body=None, headers=None, host=None):
+def _req(httpd, method, path, body=None, headers=None, host=None, declared_length=None):
     port = httpd.server_address[1]
     conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
     h = {"Host": host or f"127.0.0.1:{port}", **(headers or {})}
@@ -28,7 +28,7 @@ def _req(httpd, method, path, body=None, headers=None, host=None):
     conn.putrequest(method, path, skip_host=True, skip_accept_encoding=True)
     for k, v in h.items():
         conn.putheader(k, v)
-    conn.putheader("Content-Length", str(len(data or b"")))
+    conn.putheader("Content-Length", str(len(data or b"") if declared_length is None else declared_length))
     conn.endheaders(data)
     resp = conn.getresponse()
     raw = resp.read()
@@ -82,8 +82,9 @@ def test_bad_requests_get_plain_errors(httpd):
     status, body, _ = _req(httpd, "POST", "/v1/tools/engram_correct", {"memory_id": "zzzz9999", "content": "x"})
     assert status == 422 and "no memory" in body["error"]
     assert _req(httpd, "DELETE", "/health")[0] == 405
-    big = b'{"query": "' + b"a" * (srv.MAX_BODY + 10) + b'"}'
-    assert _req(httpd, "POST", "/v1/tools/engram_search", big)[0] == 413
+    # The size is judged from Content-Length alone, so the body is never read (and the test can't race
+    # a client that is still sending when the server hangs up).
+    assert _req(httpd, "POST", "/v1/tools/engram_search", b"", declared_length=srv.MAX_BODY + 10)[0] == 413
 
 
 def test_web_pages_and_forwarded_requests_are_refused_without_a_token(httpd):
