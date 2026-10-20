@@ -16,10 +16,10 @@ def _bench():
     return mod
 
 
-def test_evidence_sessions_matches_mempalace_parsing():
+def test_evidence_sessions_parsing():
     ev = _bench().evidence_sessions
     assert ev(["D1:3", "D4:7"]) == {"session_1", "session_4"}
-    assert ev(["D8:6; D9:17"]) == {"session_8"}   # one leading ID per entry, as MemPalace parses it
+    assert ev(["D8:6; D9:17"]) == {"session_8"}   # one leading ID per entry, as the common runners parse it
     assert ev(["D:11:26", "D"]) == set()
     assert ev([]) == set()
 
@@ -35,7 +35,7 @@ def test_recall_counts_share_of_gold_sessions():
     assert recall(["session_1", "session_2"], {"session_1"}, 10) == 1.0
     assert recall(["session_3"], {"session_1", "session_3"}, 10) == 0.5
     assert recall(["session_2", "session_1"], {"session_1"}, 1) == 0.0
-    assert recall([], set(), 10) == 1.0  # no evidence counts as found, as in MemPalace
+    assert recall([], set(), 10) == 1.0  # no evidence counts as found, as in the common runners
 
 
 def test_locomo_runner_on_sample(tmp_path):

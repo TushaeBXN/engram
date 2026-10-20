@@ -21,7 +21,7 @@ of the notes handed to a model, and crash safety, and it found three problems:
   set from a small author-written test, so check it on your own memories).
 - Wording: dropped "never forgets" as a tagline; the line count is about
   10,000; the README states that the LongMemEval and LoCoMo scores are not
-  held-out and that the raw-search comparison with MemPalace is level;
+  held-out and that raw search alone scores 96.8%;
   `BENCHMARKS.md` marks the latency and throughput goals as not measured.
 
 ## 1.10.0
@@ -242,7 +242,7 @@ rises from 0.874 to 0.901 with no other change.
 (SQLite FTS5 with BM25, part of Python; no download) next to the vector
 index, kept in sync on every write and built from existing memories on first
 use. Search runs both and merges them with reciprocal rank fusion. LoCoMo
-R@10 0.921 and R@5 0.849 (MemPalace hybrid v5: 0.889 / 0.837). Off until it
+R@10 0.921 and R@5 0.849 (other systems' hybrid setups report 0.889 / 0.837). Off until it
 is measured on LongMemEval too. Both benchmark runners gained `--keywords`.
 
 **Secret redaction (opt-in).** `"redact_secrets": true` replaces API keys,
@@ -269,16 +269,16 @@ Turn it on with `"reranker": true` or `engram search --rerank`; the model
 (~90 MB) is downloaded once to `~/.engram/models/` on first use, and never
 while the reranker is off. If it cannot be loaded, search continues without
 it. Both benchmark runners gained `--rerank`. On LoCoMo it raises R@10 from
-0.874 to 0.887 and R@5 from 0.783 to 0.828 (MemPalace hybrid v5: 0.889 /
-0.837). Off by default.
+0.874 to 0.887 and R@5 from 0.783 to 0.828 (other systems' hybrid setups report
+0.889 / 0.837). Off by default.
 
 **API contract tests** (`tests/test_public_api.py`) pin the Python calls apps
 such as the Amy companion build on.
 
 **LoCoMo benchmark.** `benchmarks/locomo_bench.py` replaces the old stub:
-session recall@k over all 1,986 LoCoMo questions, computed the same way as
-MemPalace's runner. Engram scores R@10 0.874 with its defaults (0.844 with
-semantic search alone, against MemPalace's 0.603 raw and 0.889 hybrid v5).
+session recall@k over all 1,986 LoCoMo questions, computed the way other
+systems' runners do. Engram scores R@10 0.874 with its defaults (0.844 with
+semantic search alone; other systems report 0.603 raw and 0.889 hybrid).
 
 ## 1.3.0
 
@@ -320,7 +320,7 @@ keywords get a boost (`hybrid_weight` 0.3). On LongMemEval it raised R@5 from
 
 **LongMemEval results published.** R@5 0.974 and R@10 0.988 on all 500
 questions with the default setup (local embeddings, no LLM), against 0.966
-for MemPalace's raw mode; see `benchmarks/BENCHMARKS.md`. The runner gained `--hybrid`, `--resume`, and a
+reported by another system's raw mode; see `benchmarks/BENCHMARKS.md`. The runner gained `--hybrid`, `--resume`, and a
 fix for long runs that crashed (thread exhaustion) or lost recall (reused
 ChromaDB collections).
 

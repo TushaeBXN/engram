@@ -200,7 +200,7 @@ def run_longmemeval(data_file: Path, limit: int | None = None, backend: str = "c
                     hybrid_weight: float = 0.0, resume: bool = False,
                     temporal_weight: float = 0.0, preferences: bool = False,
                     rerank: bool = False, keywords: bool = False) -> dict:
-    """Session-level retrieval recall on LongMemEval (same metric as MemPalace's "raw" R@k).
+    """Session-level retrieval recall on LongMemEval (the usual "raw" R@k metric).
 
     For each question a fresh château and index are built from its haystack
     sessions; a hit is counted at k if any gold answer session ranks in the

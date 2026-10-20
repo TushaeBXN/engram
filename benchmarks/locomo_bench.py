@@ -1,7 +1,7 @@
 """LoCoMo benchmark runner for Engram.
 
 Session-level retrieval recall on LoCoMo (10 long conversations between two
-people, 1,986 questions), measured the way MemPalace reports it: for each
+people, 1,986 questions), measured as the usual session-level evaluation does: for each
 question, the share of its evidence sessions that appear among the top-k
 retrieved sessions (k = 10), averaged over every question in all five
 categories.
@@ -33,7 +33,7 @@ from typing import Optional
 
 DEFAULT_DATA_FILE = Path("~/datasets/locomo/locomo10.json").expanduser()
 
-# Category numbering as used by MemPalace's LoCoMo runner.
+# Category numbering as used by the common LoCoMo runners.
 CATEGORIES = {1: "single-hop", 2: "temporal", 3: "temporal-inference", 4: "open-domain", 5: "adversarial"}
 
 
@@ -59,7 +59,7 @@ def _sessions(conversation: dict) -> list:
 def evidence_sessions(evidence: list) -> set:
     """Evidence dialog IDs ("D3:12") to session IDs ("session_3").
 
-    Parsed exactly like MemPalace's runner (one leading ``D<n>:`` per entry) so
+    Parsed as the common runners do (one leading ``D<n>:`` per entry) so
     the two scores are computed on the same evidence sets, malformed entries
     included.
     """

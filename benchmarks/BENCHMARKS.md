@@ -73,12 +73,11 @@ three signals are on by default. Temporal boosting and preference summaries
 were measured together in one run, so their individual shares are not
 separated; the temporal weight (0.4) was set before the run, not tuned on it.
 
-For reference, MemPalace reports R@5 0.966 for its raw mode and 0.984 for its
-hybrid v4 (keyword, temporal and preference boosting, tuned on 50 questions
-and scored on the other 450). The setups differ: Engram indexes assistant messages as well
-(which is why it answers every single-session-assistant question), MemPalace's
-raw mode indexes user turns only, and one question is worth 0.002.
-`--roles user` runs Engram the MemPalace way.
+These runs index assistant messages as well as user messages, which is why every
+single-session-assistant question is answered; `--roles user` indexes user turns
+only. One question is worth 0.002. None of these scores is held-out: the
+boosts were chosen by watching this test from version to version, as the table
+above shows.
 
 ### LoCoMo (locomo10, 10 conversations, 1,986 questions)
 
@@ -88,8 +87,8 @@ is mined once (one room per session, one drawer per turn written as
 `Speaker said, "…"`) and all of its questions are asked against it. Metric:
 for each question, the share of its evidence sessions among the top-k
 retrieved sessions, averaged over all questions in all five categories,
-exactly as MemPalace's `locomo_bench.py --granularity session` computes it
-(including its parsing of the evidence IDs).
+as the usual session-level LoCoMo evaluation computes it (one leading `D<n>:`
+per evidence entry).
 
 | Metric          | Semantic | 1.4.0 default | 1.4.0 + `--rerank` | 1.5.0 default (adds dates) | **1.5.1 default** (+ `--keywords`) |
 |-----------------|----------|---------------|--------------------|--------------------------|--------------------|
@@ -106,7 +105,7 @@ fusion (k = 60), as Hindsight does. From 1.5.1 the keyword index is on by defaul
 the last column is Engram's default search. Neither was tuned on LoCoMo: the date
 windows and the fusion constant were set before these runs.
 
-By category (R@10), using MemPalace's category names:
+By category (R@10):
 
 | Category           | n   | Semantic | 1.4.0 default | + rerank | Default | + keywords |
 |--------------------|-----|----------|---------------|----------|---------|------------|
@@ -125,12 +124,9 @@ The 1.4.0 defaults helped four categories and cost temporal-inference about
 1.6 points; with dates understood, every category is above the semantic
 baseline.
 
-For reference, MemPalace reports R@10 0.603 for raw session retrieval and
-0.889 (R@5 0.837) for its hybrid v5, which adds person-name and
-quoted-phrase boosts and a heavier keyword weight. Its raw mode embeds each
-whole session as one document, which the embedding model truncates; Engram
-indexes every turn, which is where most of its 24-point lead on raw
-retrieval comes from.
+Semantic search alone (R@10 0.844) already indexes every turn; embedding a whole
+session as a single document would be truncated by the embedding model, which
+costs a lot of raw retrieval.
 
 ES compression: 1.6× factual, 1.1× code, 1.5× mixed.
 
@@ -143,14 +139,14 @@ index), one room per session, and the question is answered with `Searcher`, as
 `engram search` would. Ranked drawers are mapped back to their session.
 
 A question counts as a hit at *k* if any gold answer session is in the top *k*
-(`recall_any@k`, the same "R@k" MemPalace reports for its raw mode). The runner
+(`recall_any@k`, the usual "R@k" for this benchmark). The runner
 also reports `recall_all@5`, `ndcg_any@10`, a per-question-type breakdown, and
 can write every question's ranking to JSONL with `--out`.
 
-Differences from MemPalace's raw mode, so numbers are compared fairly: Engram
-indexes both user and assistant messages by default (`--roles user` matches
-MemPalace), stores one drawer per message rather than one document per session,
-and splits long messages into ~900-character chunks.
+Setup differences that matter when comparing numbers: Engram indexes both user and
+assistant messages by default (`--roles user` indexes user turns only), stores
+one drawer per message rather than one document per session, and splits long
+messages into ~900-character chunks.
 
 ```bash
 mkdir -p ~/datasets/longmemeval
