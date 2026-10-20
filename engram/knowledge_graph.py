@@ -63,7 +63,7 @@ class KnowledgeGraph:
     def __init__(self, db_path: Optional[Path] = None) -> None:
         self._path = (db_path or DB_PATH).expanduser()
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(str(self._path))
+        self._conn = sqlite3.connect(str(self._path), check_same_thread=False)  # engram serve calls it from worker threads, one at a time
         self._conn.row_factory = sqlite3.Row
         self._create_schema()
 

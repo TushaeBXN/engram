@@ -27,6 +27,13 @@ class ChromaDBBackend(VectorBackend):
     ) -> None:
         import chromadb  # imported here — no network call at import time
 
+        from engram import config, embedding
+
+        # An embedding server from config gets its own collection, so the
+        # default index is never mixed with vectors from another model.
+        server = embedding.settings(config.load_config())
+        if server:
+            collection_name = f"{collection_name}__{embedding.collection_suffix(server)}"
         self._collection_name = collection_name
         self._persist_dir = str(Path(persist_directory).expanduser())
         Path(self._persist_dir).mkdir(parents=True, exist_ok=True)
@@ -35,8 +42,14 @@ class ChromaDBBackend(VectorBackend):
         self._col = self._client.get_or_create_collection(
             name=collection_name,
             metadata={"hnsw:space": "cosine"},
-            embedding_function=_cached_default_embedding_function(),
+            embedding_function=(embedding.chroma_function(server) if server
+                                else _cached_default_embedding_function()),
         )
+        self.embedding_server = server
+        if server and self._col.count() == 0:
+            import sys
+            print(f"engram: using the embedding server at {server['url']} ({server['model']}); its index is "
+                  "empty. Run `engram reindex` to fill it from your memories.", file=sys.stderr)
 
     # ------------------------------------------------------------------
 
@@ -62,7 +75,10 @@ class ChromaDBBackend(VectorBackend):
             kwargs["where"] = _chroma_where(where)
         try:
             res = self._col.query(**kwargs)
-        except Exception:
+        except Exception as exc:
+            from engram.embedding import EmbeddingConfigError
+            if isinstance(exc, EmbeddingConfigError):
+                raise  # an embedding server that is down must not look like "no results"
             return []
 
         results = []

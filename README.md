@@ -125,6 +125,23 @@ Preview what auto-recall would hand Claude with `engram recall "your message"`. 
 
 **Any other MCP app:** point it at the command `engram-mcp` (or `python -m engram.mcp_server`). Engram is also listed in the official [MCP registry](https://registry.modelcontextprotocol.io) as `io.github.TushaeBXN/engram`.
 
+**Apps that don't speak MCP** (Open WebUI, n8n, your own scripts) can use Engram over a small local web API:
+
+```bash
+engram serve                  # http://127.0.0.1:7742, the same tools and rules as MCP
+```
+
+Point the app at `http://127.0.0.1:7742/openapi.json`; every tool is described there. Or call it directly:
+
+```bash
+curl -s localhost:7742/v1/tools/engram_recall -H 'Content-Type: application/json' \
+     -d '{"message": "why did we drop Passport?"}'
+```
+
+Memories are private, so it is strict by default. It listens on localhost only, and refuses requests that look like they come from a web page or through a proxy. To reach it from another machine, use `engram serve --host 0.0.0.0`: that always requires a token (created on first use in `~/.engram/server/token`, never printed), sent as `Authorization: Bearer <token>`. `engram serve --token` requires one even on localhost. No CORS headers are ever sent, so a web page can't talk to it.
+
+**Teach any coding agent to use it.** [`skills/engram/SKILL.md`](skills/engram/SKILL.md) is a ready-made agent skill: when to recall, save and correct, and how to explain a conclusion. Install it with `npx skills add TushaeBXN/engram` (or copy the file).
+
 <details>
 <summary><b>Prefer uv, pipx or a guided setup?</b></summary>
 
@@ -341,6 +358,8 @@ The ID is the short code in the first column of `engram search` results.
 ### Setup
 ```bash
 engram init <dir>                              # guided setup
+engram serve [--host H] [--port P] [--token]  # local web API for apps without MCP (OpenAPI at /openapi.json)
+engram reindex [--wing W]                      # rebuild the search index (after changing the embedding model)
 engram connect <app>                           # add Engram to Cursor, VS Code, Gemini CLI, Codex… (no app: list)
 engram install-hooks --apply                   # Claude Code hooks: auto-recall, auto-save, save before compacting
 engram recall "a message"                      # preview what auto-recall would give Claude
@@ -436,6 +455,7 @@ Everything works out of the box. If you want to tweak things, settings live in `
 | `recall_other_min_relevance` | `0.55` | How closely another project's memories must match to be shown |
 | `projects` | `{}` | Map folders to wings when the folder name isn't what you want, e.g. `{"~/code/app": "billing"}` |
 | `keyword_search` | `true` | Exact-word index searched alongside meaning (SQLite, no download), built from your existing memories the first time it runs |
+| `embedding_api_url` / `embedding_api_model` | unset | Use an embedding server you run (LM Studio, Ollama, llama.cpp, vLLM: anything with `/v1/embeddings`) instead of the built-in English model, e.g. for other languages. Run `engram reindex` once after setting it. The server must be on this computer or your network unless `embedding_api_allow_remote` is `true`, because your memories' text is sent to it |
 | `vector_backend` | `chromadb` | Search engine: `chromadb`, `faiss` or `sqlitevec` (no compiled parts) |
 | `hybrid_weight` | `0.3` | Boost for results sharing your exact words; `0` turns it off |
 | `temporal_weight` | `0.4` | Boost for memories near a time the question names; `0` turns it off |
@@ -444,7 +464,7 @@ Everything works out of the box. If you want to tweak things, settings live in `
 | `decay_factor` / `decay_max_days` | `0.005` / `90` | How much newer memories are favoured, and for how long |
 | `chateau_path` | `~/.engram/chateau` | Where memories are stored |
 
-`ENGRAM_VECTOR_BACKEND=sqlitevec engram …` switches the backend for one run. `~/.engram/identity.txt` holds the short identity that starts each wake-up note.
+`ENGRAM_VECTOR_BACKEND=sqlitevec engram …` switches the backend for one run. An embedding server works with the default `chromadb` backend; each server and model keeps its own index, so switching back needs no reindex and your memories are never changed. `~/.engram/identity.txt` holds the short identity that starts each wake-up note.
 
 ---
 
@@ -504,6 +524,9 @@ compress("The authentication module is a critical component that has a dependenc
 | `engram/miner.py`, `engram/convo_miner.py` | Saving files and conversations |
 | `engram/lineage.py` | Corrections: which memories are current, which were replaced, and why |
 | `engram/relations.py` | Evidence links, sources, `engram why` and `engram check` |
+| `engram/server.py` | `engram serve`: the local web API and its request checks |
+| `engram/validate.py` | Checks tool arguments against each tool's schema (MCP and web) |
+| `engram/embedding.py` | Optional embedding server instead of the built-in model |
 | `engram/backup.py` | `engram export` / `engram import` |
 | `engram/recall.py` | Auto-recall hook for Claude Code |
 | `engram/mcp_server.py` | MCP server (31 tools), run as `engram-mcp` |
