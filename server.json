@@ -3,7 +3,7 @@
   "name": "io.github.TushaeBXN/engram",
   "title": "Engram",
   "description": "Local, private long-term memory for AI: verbatim, searchable, correctable. No LLM or API key.",
-  "version": "1.7.1",
+  "version": "1.8.0",
   "repository": {
     "url": "https://github.com/TushaeBXN/engram",
     "source": "github"
@@ -12,7 +12,7 @@
     {
       "registryType": "pypi",
       "identifier": "engram-chateau",
-      "version": "1.7.1",
+      "version": "1.8.0",
       "transport": {
         "type": "stdio"
       }

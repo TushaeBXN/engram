@@ -83,23 +83,38 @@ engram search "what did I decide about the database"
 
 That's all you need to try it.
 
-### Connect it to Claude
+### Connect it to your AI app
 
-**Claude Code** (one line, then restart Claude Code):
+Engram works with any app that speaks **MCP**, the standard way AI apps plug in tools. One command adds it:
 
 ```bash
-claude mcp add engram -- engram-mcp
+engram connect cursor        # or: claude-desktop, windsurf, vscode, gemini, codex, zed, lm-studio
+engram connect all           # every supported app on this computer
+engram connect               # list them, with ✓ next to the ones you have
 ```
 
-Claude now has 26 `engram_*` tools: search, remember, correct an outdated memory, recall a topic's history, a knowledge graph of people and facts, and more. Ask *"remember that we use tabs in this repo"*, *"what did we decide about auth?"* or *"we moved to PostgreSQL, update that"*.
+It adds Engram to that app's settings (keeping everything else, with a `.bak` backup) and tells you how to restart the app. Run it again any time; it changes nothing the second time.
 
-**Recommended: let Claude remember on its own.**
+| App | Setting it writes |
+|---|---|
+| Claude Desktop | `claude_desktop_config.json` |
+| Cursor | `~/.cursor/mcp.json` |
+| Windsurf | `~/.codeium/windsurf/mcp_config.json` |
+| VS Code (Copilot agent mode) | your user `mcp.json` |
+| Gemini CLI | `~/.gemini/settings.json` |
+| Codex CLI | `~/.codex/config.toml` |
+| Zed, LM Studio | prints the snippet to paste |
+
+Every app then has 27 `engram_*` tools: recall, search, remember, correct an outdated memory, a topic's history, a knowledge graph of people and facts, and more. On connect, Engram also tells the AI how to use them: check memory before answering anything that depends on past work, save decisions, and correct rather than contradict. (Apps decide whether to pass that guidance to the model; most current ones do.) Ask *"remember that we use tabs in this repo"*, *"what did we decide about auth?"* or *"we moved to PostgreSQL, update that"*.
+
+**Claude Code** gets the most: memory that works without being asked.
 
 ```bash
+engram connect claude-code        # prints the one-line `claude mcp add` command
 engram install-hooks --apply      # then restart Claude Code
 ```
 
-This adds three Claude Code hooks to `~/.claude/settings.json` (your existing settings are kept, with a backup):
+`install-hooks` adds three Claude Code hooks to `~/.claude/settings.json` (your existing settings are kept, with a backup):
 
 - **Auto-recall.** Each time you send Claude a message, Engram searches your memory first. If something clearly relevant turns up, Claude gets a short note with up to 3 memories before it answers, current versions first and outdated ones labelled. You ask *"why did we drop Passport?"* in a brand-new chat, and Claude already knows. Nothing is added when nothing is relevant, a memory isn't repeated within a session, and it takes about a second.
 - **Project-aware.** Memories are filed under the project you're working in (the git repo or folder name), and recall shows that project's memories first; other projects' notes only appear when they match very closely.
@@ -108,19 +123,7 @@ This adds three Claude Code hooks to `~/.claude/settings.json` (your existing se
 
 Preview what auto-recall would hand Claude with `engram recall "your message"`. Run `engram install-hooks` without `--apply` to see the settings instead of applying them, or add `--no-recall` to skip auto-recall.
 
-**Claude Desktop:** add this to `claude_desktop_config.json` (macOS: `~/Library/Application Support/Claude/`, Windows: `%APPDATA%\Claude\`) and restart the app:
-
-```json
-{
-  "mcpServers": {
-    "engram": { "command": "engram-mcp" }
-  }
-}
-```
-
-If Claude Desktop can't find `engram-mcp`, use its full path (`which engram-mcp` prints it).
-
-Other apps that speak **MCP** (Cursor, Windsurf, Zed and so on) work the same way: the command is `engram-mcp`.
+**Any other MCP app:** point it at the command `engram-mcp` (or `python -m engram.mcp_server`). Engram is also listed in the official [MCP registry](https://registry.modelcontextprotocol.io) as `io.github.TushaeBXN/engram`.
 
 <details>
 <summary><b>Prefer uv, pipx or a guided setup?</b></summary>
@@ -305,6 +308,7 @@ The ID is the short code in the first column of `engram search` results.
 ### Setup
 ```bash
 engram init <dir>                              # guided setup
+engram connect <app>                           # add Engram to Cursor, VS Code, Gemini CLI, Codex… (no app: list)
 engram install-hooks --apply                   # Claude Code hooks: auto-recall, auto-save, save before compacting
 engram recall "a message"                      # preview what auto-recall would give Claude
 engram setup-reranker                          # download the reranker model (90 MB) and turn it on
@@ -451,7 +455,8 @@ compress("The authentication module is a critical component that has a dependenc
 | `engram/lineage.py` | Corrections: which memories are current, which were replaced, and why |
 | `engram/backup.py` | `engram export` / `engram import` |
 | `engram/recall.py` | Auto-recall hook for Claude Code |
-| `engram/mcp_server.py` | MCP server (26 tools), run as `engram-mcp` |
+| `engram/mcp_server.py` | MCP server (27 tools), run as `engram-mcp` |
+| `engram/connect.py` | `engram connect`: adds Engram to AI apps' settings |
 | `engram/layers.py`, `engram/shorthand.py` | Wake-up note and ES shorthand |
 | `engram/knowledge_graph.py`, `engram/agents.py` | Knowledge graph and agent diaries |
 | `engram/backends/` | ChromaDB (default), FAISS, sqlite-vec |

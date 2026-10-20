@@ -1104,6 +1104,55 @@ def merge_hook_settings(path: Path, snippet: dict) -> int:
     return added
 
 
+@app.command("connect")
+def cmd_connect(
+    target: Optional[str] = typer.Argument(
+        None, help="App to connect: claude-desktop, cursor, windsurf, vscode, gemini, codex, zed, lm-studio, "
+                   "claude-code, or 'all' for every one installed. Leave out to list them."),
+):
+    """Connect Engram's memory to an AI app (adds the MCP server to its settings, with a backup)."""
+    from rich.markup import escape
+
+    from engram import connect as cn
+
+    known = cn.apps()
+    if target is None:
+        console.print("[bold]Apps Engram can connect to[/bold] (✓ = looks installed):")
+        for app_ in known.values():
+            mark = "[green]✓[/green]" if app_.path.parent.exists() else " "
+            console.print(f"  {mark} engram connect {app_.key:15} {escape(app_.name)}")
+        console.print("    engram connect claude-code     Claude Code (MCP + auto-recall hooks)")
+        console.print("\nOr [bold]engram connect all[/bold] for every installed app.")
+        return
+    if target == "claude-code":
+        command, args = cn.server_command()
+        console.print("Run this, then restart Claude Code:", highlight=False)
+        print(f"claude mcp add {cn.SERVER_NAME} -- {command} {' '.join(args)}")
+        console.print("And for automatic recall and saving: [bold]engram install-hooks --apply[/bold]")
+        return
+    targets = cn.detected() if target == "all" else ([known[target]] if target in known else None)
+    if targets is None:
+        console.print(f"[red]Unknown app {escape(target)!r}.[/red] Run [bold]engram connect[/bold] to see the list.")
+        raise typer.Exit(1)
+    if not targets:
+        console.print("No supported apps found. Run [bold]engram connect[/bold] to see the list.")
+        return
+    for app_ in targets:
+        try:
+            status = cn.connect(app_)
+        except ValueError as exc:
+            console.print(f"[yellow]{escape(app_.name)}:[/yellow] {escape(str(exc))}. Add this to "
+                          f"{escape(str(app_.path))}:", highlight=False)
+            print(cn.snippet(app_))
+            console.print(f"  Then: {escape(app_.restart)}.")
+            continue
+        if status == "unchanged":
+            console.print(f"[green]✓[/green] {escape(app_.name)} already has Engram.")
+        else:
+            console.print(f"[green]✓[/green] {escape(app_.name)}: Engram {status} in {escape(str(app_.path))} "
+                          f"(backup: {escape(app_.path.name)}.bak). {escape(app_.restart)}.")
+
+
 @app.command("recall")
 def cmd_recall(
     message: str = typer.Argument(..., help="A message you might send Claude."),

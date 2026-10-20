@@ -1,4 +1,4 @@
-"""Engram MCP Server — 26 tools for Claude, ChatGPT, and Cursor.
+"""Engram MCP Server — 27 tools for Claude, Cursor, VS Code, Gemini, Codex and any MCP client.
 
 Implements the Model Context Protocol over stdio.  Start with::
 
@@ -6,7 +6,7 @@ Implements the Model Context Protocol over stdio.  Start with::
 
 All tools are prefixed ``engram_``.
 
-Tool list (26):
+Tool list (27):
     1.  engram_search          — semantic search
     2.  engram_add_memory      — store a new drawer
     3.  engram_wake_up         — return L0+L1 context
@@ -33,6 +33,10 @@ Tool list (26):
     24. engram_supersede       — mark one stored memory as replacing another
     25. engram_dispute         — mark two memories as conflicting, undecided
     26. engram_history         — a memory's status and replacement history
+    27. engram_recall          — the few memories clearly relevant to a message (auto-recall)
+
+On connect, the server also sends ``instructions`` (MCP InitializeResult) so
+clients that pass them to the model know to check memory first.
 """
 
 from __future__ import annotations
@@ -66,6 +70,17 @@ def _result(id: Any, result: Any) -> dict:
 # ---------------------------------------------------------------------------
 # Tool definitions
 # ---------------------------------------------------------------------------
+
+# Sent to every client on connect; clients that support it show it to the model.
+INSTRUCTIONS = (
+    "Engram is this user's long-term memory, kept on their own computer. "
+    "Before answering a request that may depend on earlier work, decisions, preferences, people or "
+    "projects, call engram_recall with the user's message (and the project folder, if you know it); "
+    "it returns only clearly relevant memories, or says nothing matched. "
+    "When the user makes a decision or states a lasting fact or preference, save it with "
+    "engram_add_memory. When something changed, call engram_correct on the old memory instead of "
+    "adding a contradicting one. Memories marked OUTDATED are history: use the current version."
+)
 
 TOOLS: list[dict] = [
     {
@@ -330,6 +345,20 @@ TOOLS: list[dict] = [
         },
     },
     {
+        "name": "engram_recall",
+        "description": ("The few memories clearly relevant to a message, current versions first, or a "
+                        "note that nothing matched. Call it before answering anything that may depend "
+                        "on past work, decisions or preferences."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "message": {"type": "string", "description": "The user's message or the task at hand"},
+                "cwd": {"type": "string", "description": "Project folder, if known (its memories come first)"},
+            },
+            "required": ["message"],
+        },
+    },
+    {
         "name": "engram_correct",
         "description": ("Save a correction: a new memory that replaces an outdated one (same "
                         "wing/room/hall). The old memory stays searchable but is marked "
@@ -454,6 +483,13 @@ class EngramMCPServer:
     def _missing(memory_id):
         from engram.lineage import LineageError
         raise LineageError(f"no memory with ID {memory_id!r}")
+
+    def _tool_engram_recall(self, message, cwd=None):
+        from engram.recall import recall
+        # Asked for explicitly, so it works even when the Claude Code hook is switched off.
+        note = recall(message, searcher=self.searcher, cfg={**self.cfg, "recall": True},
+                      remember=False, cwd=cwd)
+        return note or "Nothing in memory is clearly relevant to this."
 
     def _tool_engram_correct(self, memory_id, content, reason=""):
         from engram.lineage import correct_memory
@@ -591,6 +627,7 @@ def _handle_message(server: EngramMCPServer, msg: dict) -> dict | None:
             "protocolVersion": "2024-11-05",
             "capabilities": {"tools": {}},
             "serverInfo": {"name": "engram", "version": __version__},
+            "instructions": INSTRUCTIONS,
         })
 
     if method == "tools/list":
