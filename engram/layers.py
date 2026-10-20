@@ -23,6 +23,7 @@ from typing import Optional
 
 from engram.chateau import HALL_TYPES, Chateau
 from engram.config import ENGRAM_DIR, get_identity, load_config
+from engram.fsio import atomic_write_text
 from engram.searcher import Searcher
 from engram.shorthand import compress
 
@@ -60,7 +61,7 @@ class LayerStack:
         """Write the L0 identity file."""
         from engram.config import IDENTITY_PATH, ensure_engram_dir
         ensure_engram_dir()
-        IDENTITY_PATH.write_text(text.strip())
+        atomic_write_text(IDENTITY_PATH, text.strip())
 
     # ------------------------------------------------------------------
     # L1 — critical facts
@@ -72,20 +73,39 @@ class LayerStack:
             return f"[L1:facts]\n{_L1_PATH.read_text().strip()}"
         return "[L1] No critical facts set. Run `engram wake-up` to generate."
 
-    def rebuild_l1(self, wing: Optional[str] = None, n: int = 20) -> str:
-        """Regenerate L1 from the most recent/pinned facts hall drawers."""
-        lines = []
-        for drawer in self.palace.iter_drawers(wing=wing, hall="facts"):
-            if drawer.pinned or drawer.age_days() < 30:
-                lines.append(drawer.content)
-            if len(lines) >= n:
-                break
-        if not lines:
-            content = "No critical facts available."
-        else:
-            content = compress("\n".join(lines[:n]))
+    def rebuild_l1(self, wing: Optional[str] = None, n: int = 20, budget_tokens: Optional[int] = None) -> str:
+        """Regenerate L1 from the most important recent facts, within a size budget.
+
+        Candidates are ``facts`` memories that are pinned or under 30 days old.
+        Pinned ones come first, then the newest. Facts are added until the
+        compressed block reaches *budget_tokens* (default: the ``l1_budget_tokens``
+        setting, 120; a token is estimated as 4 characters), so the wake-up note
+        stays small however many facts qualify. A single fact longer than the
+        whole budget is cut at a word boundary. Memories that have been
+        replaced by a correction are skipped.
+        """
+        from engram.lineage import Lineage
+
+        if budget_tokens is None:
+            budget_tokens = int(load_config().get("l1_budget_tokens", 120))
+        budget_chars = max(40, budget_tokens * 4)
+        lineage = Lineage(self.palace.path)
+        candidates = [d for d in self.palace.iter_drawers(wing=wing, hall="facts")
+                      if (d.pinned or d.age_days() < 30) and lineage.status(d.id)["status"] != "superseded"]
+        pinned = [d for d in candidates if d.pinned]
+        recent = sorted((d for d in candidates if not d.pinned), key=lambda d: d.timestamp, reverse=True)
+        lines, used = [], 0
+        for drawer in (pinned + recent)[:n]:
+            line = compress(drawer.text().strip())
+            if used + len(line) + 1 > budget_chars:
+                if lines:
+                    break
+                line = line[:budget_chars].rsplit(" ", 1)[0]
+            lines.append(line)
+            used += len(line) + 1
+        content = "\n".join(lines) if lines else "No critical facts available."
         _L1_PATH.parent.mkdir(parents=True, exist_ok=True)
-        _L1_PATH.write_text(content)
+        atomic_write_text(_L1_PATH, content)
         return content
 
     # ------------------------------------------------------------------

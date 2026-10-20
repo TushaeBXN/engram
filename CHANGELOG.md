@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.10.1
+
+**Claims checked against the code; the gaps fixed.** `benchmarks/trust_eval.py`
+([results](benchmarks/TRUST.md)) measures corrections, the size and accuracy
+of the notes handed to a model, and crash safety, and it found three problems:
+- **A crash could silently lose a memory.** Memory files were written in
+  place, so a write cut off part-way left a file that reading skipped without
+  a word (10 of 40 forced crashes with large memories). Every file that holds
+  a memory (memories, wings, rooms, summaries, tunnels, provenance, agent
+  profiles, identity) is now written to a temporary file and renamed into
+  place. `engram audit` reports unreadable memory files, and `audit --fix`
+  removes interrupted-write leftovers older than an hour (never a memory).
+- **The wake-up note was not ~170 tokens.** It measured 459 on a test set,
+  and chose facts in folder order. It now uses pinned facts first, then the
+  newest, skips corrected ones, and stays within `l1_budget_tokens` (120).
+- **Auto-recall's relevance bar was too high.** At 0.35 it answered 15 of 20
+  test questions, at 0.30 it answers 17 with no more false alarms
+  (`recall_min_relevance` default 0.35 -> 0.30; the table is in TRUST.md,
+  set from a small author-written test, so check it on your own memories).
+- Wording: dropped "never forgets" as a tagline; the line count is about
+  10,000; the README states that the LongMemEval and LoCoMo scores are not
+  held-out and that the raw-search comparison with MemPalace is level;
+  `BENCHMARKS.md` marks the latency and throughput goals as not measured.
+
 ## 1.10.0
 
 **Engram for apps without MCP, other languages, and clearer errors.**

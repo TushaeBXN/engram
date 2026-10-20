@@ -25,6 +25,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from engram.config import ENGRAM_DIR
+from engram.fsio import atomic_write_text
 from engram.shorthand import decompress
 
 AGENTS_DIR = ENGRAM_DIR / "agents"
@@ -109,7 +110,7 @@ class AgentDiary:
 
     def save_profile(self, profile: AgentProfile) -> None:
         self._profile = profile
-        self._profile_path.write_text(json.dumps(profile.to_dict(), indent=2))
+        atomic_write_text(self._profile_path, json.dumps(profile.to_dict(), indent=2))
 
     def create(self, focus: str = "", model_hint: str = "") -> AgentProfile:
         """Create or update the agent profile."""

@@ -45,7 +45,7 @@ class Onboarder:
 
         console.print(
             Panel(
-                "[bold cyan]Welcome to Engram[/bold cyan] — the AI memory layer that never forgets.\n\n"
+                "[bold cyan]Welcome to Engram[/bold cyan] — local, private long-term memory for AI.\n\n"
                 "This will set up your personal memory château at [bold]~/.engram/[/bold].\n"
                 "It takes about 2 minutes.",
                 title="🏰 Engram Setup",

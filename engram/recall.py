@@ -137,7 +137,7 @@ def select(results: list[dict], cfg: dict, seen: set = frozenset(),
     With a *project*, its memories (and neutral "default" ones) need
     ``recall_min_relevance``; other projects' need ``recall_other_min_relevance``.
     """
-    min_rel = float(_cfg_value(cfg, "recall_min_relevance", 0.35))
+    min_rel = float(_cfg_value(cfg, "recall_min_relevance", 0.30))
     other_rel = float(_cfg_value(cfg, "recall_other_min_relevance", 0.55))
     limit = int(_cfg_value(cfg, "recall_max", 3))
     excluded = set(_cfg_value(cfg, "recall_exclude_wings", ["library"]))

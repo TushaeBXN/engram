@@ -40,6 +40,7 @@ class AuditReport:
     kg_missing_valid_from: int = 0
     rooms_single_wing: list[str] = field(default_factory=list)
     pinned_count: int = 0
+    unreadable_files: list[str] = field(default_factory=list)   # damaged memories and interrupted writes
     total_drawers: int = 0
     total_rooms: int = 0
     total_wings: int = 0
@@ -52,6 +53,7 @@ class AuditReport:
             "kg_missing_valid_from": self.kg_missing_valid_from,
             "rooms_single_wing": len(self.rooms_single_wing),
             "pinned_count": self.pinned_count,
+            "unreadable_files": list(self.unreadable_files),
             "total_drawers": self.total_drawers,
             "total_rooms": self.total_rooms,
             "total_wings": self.total_wings,
@@ -117,6 +119,8 @@ class Auditor:
                 if room.name not in linked_rooms:
                     report.rooms_single_wing.append(f"{wing.name}/{room.name}")
 
+        report.unreadable_files = [str(p) for p in self.palace.unreadable_files()]
+
         # KG integrity
         report.kg_missing_valid_from = len(self.kg.triples_missing_valid_from())
 
@@ -125,11 +129,22 @@ class Auditor:
     # ------------------------------------------------------------------
 
     def fix_safe(self, report: AuditReport) -> int:
-        """Auto-resolve safe issues (orphaned drawers, empty closets).
+        """Auto-resolve safe issues (empty closets, stale temporary files).
 
         Returns the number of issues fixed.
         """
         fixed = 0
+
+        # Clear leftovers of interrupted writes (never a memory file). An hour's
+        # grace keeps clear of a write that is still in progress.
+        import time
+        for tmp in self.palace.path.glob("**/.*.tmp"):
+            try:
+                if time.time() - tmp.stat().st_mtime > 3600:
+                    tmp.unlink()
+                    fixed += 1
+            except OSError:
+                continue
 
         # Rebuild empty closets via compression
         for room_key in report.rooms_no_closet:
@@ -198,6 +213,14 @@ def format_report(report: AuditReport) -> str:
         f"KG triples missing valid_from:         [yellow]{report.kg_missing_valid_from}[/yellow]",
         f"Rooms in only 1 wing (no tunnels):     [dim]{len(report.rooms_single_wing)}[/dim]",
         f"Pinned memories:                       [cyan]{report.pinned_count}[/cyan]",
+        "Unreadable memory files:               "
+        + (f"[red]{len(report.unreadable_files)}[/red]" if report.unreadable_files else "[green]0[/green]"),
+    ]
+    for path in report.unreadable_files[:10]:
+        lines.append(f"  [red]•[/red] {path}")
+    if len(report.unreadable_files) > 10:
+        lines.append(f"  … and {len(report.unreadable_files) - 10} more")
+    lines += [
         "",
         f"[dim]Total: {report.total_wings} wings, {report.total_rooms} rooms, "
         f"{report.total_drawers} drawers[/dim]",

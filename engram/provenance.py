@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+from engram.fsio import atomic_write_text
+
 
 @dataclass
 class Provenance:
@@ -61,7 +63,7 @@ class ProvenanceTracker:
     def track(self, provenance: Provenance) -> None:
         """Write a provenance record to disk."""
         prov_file = self.prov_dir / f"{provenance.memory_id}.json"
-        prov_file.write_text(json.dumps(provenance.to_dict(), indent=2))
+        atomic_write_text(prov_file, json.dumps(provenance.to_dict(), indent=2))
 
     def get(self, memory_id: str) -> Optional[Provenance]:
         """Fetch the provenance record for a single memory ID."""

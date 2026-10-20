@@ -32,7 +32,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # 0..1), wings never shown, and whether to rerank (slower).
     "recall": True,
     "recall_max": 3,
-    "recall_min_relevance": 0.35,
+    "recall_min_relevance": 0.30,
     "recall_other_min_relevance": 0.55,  # memories from a different project than the one open
     "recall_exclude_wings": ["library"],
     "recall_rerank": False,
@@ -41,6 +41,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # model once to ~/.engram/models/.
     "reranker": False,
     "rerank_top": 20,
+    # Size of the "key facts" part of the wake-up note (engram wake-up), in
+    # tokens (estimated as 4 characters each). Pinned facts first, then newest.
+    "l1_budget_tokens": 120,
     "collection_name": "engram_drawers",
     "people_map": {},
 }
