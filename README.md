@@ -266,10 +266,10 @@ Needs review
 
 Researchers test AI memory with two public benchmarks. Each gives the system long chat histories and asks questions whose answers are buried somewhere inside. The score is how often the system finds the right conversation.
 
-| | **Engram** (default, no LLM) | MemPalace (best without an LLM) |
-|---|---|---|
-| **[LongMemEval](https://github.com/xiaowu0162/LongMemEval)**: 500 questions, right conversation in the top 5 | **98.8%** | 98.4% |
-| **[LoCoMo](https://github.com/snap-research/locomo)**: 1,986 questions, answer's sessions in the top 10 | **92.1%** | 88.9% |
+| Benchmark (default settings, no LLM) | Engram |
+|---|---|
+| **[LongMemEval](https://github.com/xiaowu0162/LongMemEval)**: 500 questions, right conversation in the top 5 | **98.8%** |
+| **[LoCoMo](https://github.com/snap-research/locomo)**: 1,986 questions, answer's sessions in the top 10 | **92.1%** |
 
 In plain terms: ask Engram 500 questions about months of chat history, and for 494 of them the right conversation is in its top 5 results. It gets there with a small model that runs on a laptop, no LLM and no API. These tests measure finding the right conversation. They don't measure whether corrections, evidence links or recall notes make an AI more accurate; [benchmarks/trust_eval.py](benchmarks/trust_eval.py) checks those, and the results are listed below.
 
@@ -289,12 +289,11 @@ Auto-recall trades some answers for silence and small notes; [the full table](be
 <details>
 <summary><b>The fine print</b></summary>
 
-- Both systems use the same small local embedding model (all-MiniLM-L6-v2).
-- Engram indexes the assistant's replies as well as yours; MemPalace's raw mode indexes only yours.
-- **These numbers are not held-out.** MemPalace tuned its LongMemEval hybrid on 50 questions and scored the other 450. Engram's boosts are fixed general rules, not tuned per question, but we chose which ones to ship by watching LongMemEval and LoCoMo scores from version to version (each step is in [BENCHMARKS.md](benchmarks/BENCHMARKS.md)), so some of the score is fitted to these two tests.
-- **The fairest like-for-like row is raw meaning search.** Engram scores 96.8% R@5 on LongMemEval and MemPalace's raw mode 96.6%, which is level. Read the table as "comparable", not "better".
+- It uses a small local embedding model (all-MiniLM-L6-v2). Engram indexes the assistant's replies as well as yours.
+- **These numbers are not held-out.** Engram's boosts are fixed general rules, not tuned per question, but we chose which ones to ship by watching LongMemEval and LoCoMo scores from version to version (each step is in [BENCHMARKS.md](benchmarks/BENCHMARKS.md)), so some of the score is fitted to these two tests.
+- **Raw meaning search alone, with none of those boosts, scores 96.8% R@5 on LongMemEval.** The boosts add about two points.
 - One LongMemEval question is worth 0.2 points, so small differences are a question or two.
-- With an LLM reranker (which needs an API key), MemPalace reports 99%+. Engram doesn't offer that, by design.
+- An LLM reranker (which needs an API key) can raise scores further. Engram doesn't offer one, by design.
 - Everything is reproducible from this repo. Full per-question-type results, earlier versions and the exact commands are in [benchmarks/BENCHMARKS.md](benchmarks/BENCHMARKS.md).
 </details>
 
@@ -309,7 +308,6 @@ There are several good memory tools. Here's an honest guide.
 | Memory for **Claude Code or Claude Desktop** that's private, free and just works | **Engram** |
 | A memory **library for your own AI app, companion or agent**, offline with no per-call costs | **Engram** |
 | To **read and trust** every line of code that touches your data | **Engram** |
-| The **biggest feature set** in a local memory system: LLM reranking, a hub shared across machines, Docker | **[MemPalace](https://github.com/MemPalace/mempalace)**, the project Engram's design comes from |
 | Memory for a **multi-user product** in the cloud, with a dashboard and an API | A hosted service such as Mem0, Zep or Supermemory (usually needs an account, an API key and an LLM) |
 | Just a few standing rules (*"use tabs"*, *"my name is…"*) | Claude's built-in memory or a `CLAUDE.md` file |
 
@@ -591,7 +589,7 @@ Engram is published to PyPI as `engram-chateau` from `.github/workflows/publish.
 
 ## Credits and license
 
-Engram's design (wings, rooms, halls, drawers and a temporal knowledge graph) is inspired by [MemPalace](https://github.com/MemPalace/mempalace). Some retrieval ideas (the exact-word index and date understanding) are adapted from [Hindsight](https://github.com/vectorize-io/hindsight).
+Engram's design (wings, rooms, halls, drawers and a temporal knowledge graph) is inspired by other open-source memory systems. Some retrieval ideas (the exact-word index and date understanding) are adapted from [Hindsight](https://github.com/vectorize-io/hindsight).
 
 MIT © 2026 Tushae Thomas
 
