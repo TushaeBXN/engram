@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.10.4
+
+**Saved preferences are no longer crowded out of a big index.** A live test with
+a 10,778-chunk index (mostly a companion app's own chat logs) still missed a
+saved preference: the words of an everyday request ("work", "tomorrow", "go")
+matched the logs better, so the preference never reached the top results that
+recall looks at. Recall now also searches the `preferences` hall on its own,
+and the best matching preference keeps one of the note's slots when
+conversation chatter would fill them all. In `trust_eval.py`'s `preferences`
+part, with the 6 preferences buried in 2,500 chatty notes, it finds 4 of 9
+questions (1.10.3: 2 of 9); false alarms are unchanged (3 of 12, caused by the
+chatter). `--crowd N` changes the number of chatty notes.
+
 ## 1.10.3
 
 **Saved preferences are found when you ask for a choice.** In a live test the
