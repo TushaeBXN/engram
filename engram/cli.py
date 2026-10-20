@@ -994,6 +994,7 @@ def cmd_install_hooks(
     """
     import json
     import shutil
+    import sys
 
     src_dir = Path(__file__).parent / "hooks"
     target = dest.expanduser()
@@ -1005,7 +1006,8 @@ def cmd_install_hooks(
         out.chmod(0o755)
         installed[script] = str(out)
 
-    snippet = hook_settings(installed, recall_command=None if no_recall else recall_command())
+    snippet = hook_settings(installed, recall_command=None if no_recall else recall_command(),
+                            python=sys.executable)
     console.print(f"[green]✓[/green] Hooks copied to {target}")
     if not apply:
         console.print("Add this to [bold]~/.claude/settings.json[/bold] (merge with any existing hooks), "
@@ -1035,14 +1037,22 @@ def recall_command() -> str:
     return f"{shlex.quote(sys.executable)} -m engram.recall"
 
 
-def hook_settings(installed: dict, recall_command: Optional[str]) -> dict:
+def hook_settings(installed: dict, recall_command: Optional[str], python: Optional[str] = None) -> dict:
+    """The Claude Code hooks settings. With *python*, the shell hooks run Engram
+    through that interpreter (ENGRAM_PYTHON), so they work without `engram` on PATH."""
+    import shlex
+
+    def cmd(script: str) -> str:
+        path = shlex.quote(installed[script])
+        return f"ENGRAM_PYTHON={shlex.quote(python)} {path}" if python else installed[script]
+
     hooks = {
         "PostToolUse": [{
             "matcher": "Write|Edit|MultiEdit",
-            "hooks": [{"type": "command", "command": installed["engram_save_hook.sh"]}],
+            "hooks": [{"type": "command", "command": cmd("engram_save_hook.sh")}],
         }],
         "PreCompact": [{
-            "hooks": [{"type": "command", "command": installed["engram_precompact_hook.sh"]}],
+            "hooks": [{"type": "command", "command": cmd("engram_precompact_hook.sh")}],
         }],
     }
     if recall_command:
@@ -1051,11 +1061,22 @@ def hook_settings(installed: dict, recall_command: Optional[str]) -> dict:
     return {"hooks": hooks}
 
 
-def merge_hook_settings(path: Path, snippet: dict) -> int:
-    """Add *snippet*'s hooks to the settings file at *path*, skipping ones already there.
+ENGRAM_HOOK_MARKERS = ("engram_save_hook.sh", "engram_precompact_hook.sh", "engram.recall")
 
-    Keeps a ``.bak`` copy and returns how many hook entries were added. Raises
-    ValueError if the existing file isn't valid JSON (it is then left untouched).
+
+def _is_engram_group(group) -> bool:
+    return isinstance(group, dict) and any(
+        isinstance(h, dict) and any(m in str(h.get("command", "")) for m in ENGRAM_HOOK_MARKERS)
+        for h in group.get("hooks", []))
+
+
+def merge_hook_settings(path: Path, snippet: dict) -> int:
+    """Put *snippet*'s hooks into the settings file at *path*, replacing older Engram
+    hooks and leaving every other setting and hook alone.
+
+    Keeps a ``.bak`` copy and returns how many hook entries were added or
+    updated (0 when it already matches). Raises ValueError if the existing
+    file isn't valid JSON (it is then left untouched).
     """
     import json
     import shutil
@@ -1067,15 +1088,14 @@ def merge_hook_settings(path: Path, snippet: dict) -> int:
         except ValueError as exc:
             raise ValueError(f"{path} is not valid JSON ({exc}); fix it or add the hooks by hand") from exc
     hooks = settings.setdefault("hooks", {})
-    existing = {h.get("command") for groups in hooks.values() if isinstance(groups, list)
-                for g in groups if isinstance(g, dict) for h in g.get("hooks", []) if isinstance(h, dict)}
     added = 0
     for event, groups in snippet["hooks"].items():
-        for group in groups:
-            if all(h["command"] in existing for h in group["hooks"]):
-                continue
-            hooks.setdefault(event, []).append(group)
-            added += 1
+        current = hooks.get(event) if isinstance(hooks.get(event), list) else []
+        ours = [g for g in current if _is_engram_group(g)]
+        if ours == groups:
+            continue
+        hooks[event] = [g for g in current if not _is_engram_group(g)] + groups
+        added += len(groups)
     if added:
         path.parent.mkdir(parents=True, exist_ok=True)
         if path.exists():
@@ -1085,10 +1105,19 @@ def merge_hook_settings(path: Path, snippet: dict) -> int:
 
 
 @app.command("recall")
-def cmd_recall(message: str = typer.Argument(..., help="A message you might send Claude.")):
+def cmd_recall(
+    message: str = typer.Argument(..., help="A message you might send Claude."),
+    cwd: Optional[str] = typer.Option(None, "--cwd", help="Project folder Claude would be in (default: here)."),
+):
     """Preview what auto-recall would add to Claude's context for MESSAGE."""
-    from engram.recall import recall
-    note = recall(message, remember=False)
+    import os
+
+    from engram.recall import project_wing, recall
+    folder = cwd or os.getcwd()
+    project = project_wing(folder)
+    if project:
+        console.print(f"[dim]Project: {project} (its memories come first)[/dim]")
+    note = recall(message, remember=False, cwd=folder)
     if note:
         print(note)
     else:

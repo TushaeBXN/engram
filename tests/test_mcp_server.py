@@ -199,3 +199,18 @@ def test_engram_mcp_command_points_at_the_server():
     target = re.search(r'^engram-mcp = "([\w.]+):(\w+)"', pyproject, re.M)
     assert target and target.group(1) == "engram.mcp_server"
     assert callable(getattr(mcp, target.group(2)))
+
+
+def test_registry_metadata_matches_the_package():
+    """server.json (MCP registry) must name this package and its current version."""
+    import re
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    meta = json.loads((root / "server.json").read_text())
+    version = re.search(r'^version = "([^"]+)"', (root / "pyproject.toml").read_text(), re.M).group(1)
+    assert meta["version"] == version and meta["packages"][0]["version"] == version
+    assert meta["packages"][0]["identifier"] == "engram-chateau"
+    assert len(meta["description"]) <= 100
+    assert f"mcp-name: {meta['name']}" in (root / "README.md").read_text()
+    assert re.search(r'^engram-chateau = "engram.mcp_server:run_server"', (root / "pyproject.toml").read_text(), re.M)

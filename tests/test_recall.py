@@ -93,7 +93,7 @@ def test_long_memories_are_trimmed():
 def test_hook_prints_claude_code_context_json(mem, monkeypatch, capsys):
     _, _, searcher, add = mem
     add("We switched the auth library from Passport to Lucia because sessions leaked memory.")
-    monkeypatch.setattr(rc, "recall", lambda prompt, session_id="": rc.format_note(
+    monkeypatch.setattr(rc, "recall", lambda prompt, session_id="", cwd=None: rc.format_note(
         rc.select(searcher.search(prompt, n=12), CFG)))
     payload = {"session_id": "abc", "hook_event_name": "UserPromptSubmit",
                "prompt": "why did we move off Passport for auth?"}
@@ -127,8 +127,9 @@ def test_merge_hook_settings_keeps_existing_settings_and_is_idempotent(tmp_path)
     from engram.cli import hook_settings, merge_hook_settings
     path = tmp_path / "settings.json"
     path.write_text(json.dumps({"model": "x", "hooks": {"Stop": [{"hooks": [{"type": "command", "command": "mine"}]}]}}))
-    snippet = hook_settings({"engram_save_hook.sh": "/h/save.sh", "engram_precompact_hook.sh": "/h/pre.sh"},
-                            recall_command="/py -m engram.recall")
+    snippet = hook_settings({"engram_save_hook.sh": "/h/engram_save_hook.sh",
+                             "engram_precompact_hook.sh": "/h/engram_precompact_hook.sh"},
+                            recall_command="/py -m engram.recall", python="/py")
     assert merge_hook_settings(path, snippet) == 3
     data = json.loads(path.read_text())
     assert data["model"] == "x" and data["hooks"]["Stop"][0]["hooks"][0]["command"] == "mine"
@@ -163,3 +164,42 @@ def test_cli_install_hooks_apply_and_recall_preview(engram_home, tmp_path):
     assert "UserPromptSubmit" not in res.output
     res = CliRunner().invoke(app, ["recall", "something nobody ever saved anywhere"])
     assert res.exit_code == 0 and "Nothing relevant enough" in res.output
+
+
+def test_reinstalling_replaces_older_engram_hooks(tmp_path):
+    from engram.cli import hook_settings, merge_hook_settings
+    path = tmp_path / "settings.json"
+    old = {"hooks": {"PostToolUse": [
+        {"matcher": "Write|Edit|MultiEdit", "hooks": [{"type": "command", "command": "/h/engram_save_hook.sh"}]},
+        {"matcher": "Bash", "hooks": [{"type": "command", "command": "my-linter"}]}]}}
+    path.write_text(json.dumps(old))
+    new = hook_settings({"engram_save_hook.sh": "/h/engram_save_hook.sh",
+                         "engram_precompact_hook.sh": "/h/engram_precompact_hook.sh"}, "/py -m engram.recall", python="/py")
+    merge_hook_settings(path, new)
+    post = json.loads(path.read_text())["hooks"]["PostToolUse"]
+    commands = [h["command"] for g in post for h in g["hooks"]]
+    assert commands == ["my-linter", "ENGRAM_PYTHON=/py /h/engram_save_hook.sh"]  # old entry replaced, yours kept
+
+
+def test_project_wing(tmp_path, monkeypatch):
+    repo = tmp_path / "code" / "My App"
+    (repo / ".git").mkdir(parents=True)
+    (repo / "src" / "api").mkdir(parents=True)
+    assert rc.project_wing(str(repo / "src" / "api"), {}) == "my-app"       # git root's name
+    assert rc.project_wing(str(tmp_path / "loose"), {}) == "loose"          # plain folder
+    assert rc.project_wing(str(repo / "src"), {"projects": {str(repo): "billing"}}) == "billing"
+    monkeypatch.setenv("HOME", str(tmp_path))
+    assert rc.project_wing(str(tmp_path), {}) is None and rc.project_wing(None, {}) is None
+
+
+def test_recall_prefers_the_current_project(mem, tmp_path):
+    _, _, searcher, add = mem
+    add("Auth decision: we use Lucia sessions for the login flow.", wing="billing")
+    add("Auth decision: we use Lucia sessions for the login flow in the admin tool.", wing="admin")
+    repo = tmp_path / "billing"
+    (repo / ".git").mkdir(parents=True)
+    note = rc.recall("which auth sessions library do we use for login?", "s1", searcher,
+                     {**CFG, "recall_other_min_relevance": 0.99}, cwd=str(repo))
+    assert "(billing/" in note and "(admin/" not in note
+    anywhere = rc.recall("which auth sessions library do we use for login?", "s2", searcher, CFG)
+    assert "(billing/" in anywhere and "(admin/" in anywhere  # no project: both qualify

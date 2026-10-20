@@ -33,6 +33,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "recall": True,
     "recall_max": 3,
     "recall_min_relevance": 0.35,
+    "recall_other_min_relevance": 0.55,  # memories from a different project than the one open
     "recall_exclude_wings": ["library"],
     "recall_rerank": False,
     # Optional local cross-encoder that reorders the top results
