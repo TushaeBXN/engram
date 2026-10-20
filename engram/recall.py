@@ -161,8 +161,37 @@ def select(results: list[dict], cfg: dict, seen: set = frozenset(),
     return picked
 
 
-def format_note(picked: list[dict]) -> str:
+PREVIOUS_CHARS = 140
+
+
+def _previous(r: dict, palace, shown: set) -> str:
+    """For a corrected memory: what it replaced, when and why, so "what was it before?" and
+    "why did it change?" are answered by the note itself. Empty when the replaced memory is
+    already in the note (no repeating it) or can't be read."""
+    if palace is None or not r.get("supersedes"):
+        return ""
+    try:
+        from engram.lineage import Lineage
+        links = [lk for lk in Lineage(palace.path).links()
+                 if lk["kind"] == "supersedes" and lk["new"] == r["id"] and lk["old"] not in shown]
+        if not links:
+            return ""
+        link = links[-1]
+        old = palace.find_drawer(link["old"])
+    except (OSError, ValueError, LookupError):
+        return ""
+    if old is None:
+        return ""
+    text = " ".join(old.text().split())
+    if len(text) > PREVIOUS_CHARS:
+        text = text[:PREVIOUS_CHARS].rsplit(" ", 1)[0] + " …"
+    why = f": {' '.join(link['reason'].split())[:100]}" if link.get("reason") else ""
+    return f' (before, until {link["at"][:10]}{why}: "{text}")'
+
+
+def format_note(picked: list[dict], palace=None) -> str:
     lines = [HEADER]
+    shown = {r["id"] for r in picked}
     for r in picked:
         meta = r.get("metadata") or {}
         where = "/".join(x for x in (meta.get("wing"), meta.get("room")) if x)
@@ -176,7 +205,7 @@ def format_note(picked: list[dict]) -> str:
         if len(text) > SNIPPET_CHARS:
             text = text[:SNIPPET_CHARS].rsplit(" ", 1)[0] + " …"
         head = " · ".join(x for x in (where, when) if x)
-        lines.append(f"- {label}({head}) {text} [id {r['id'][:13]}]")
+        lines.append(f"- {label}({head}) {text} [id {r['id'][:13]}]{_previous(r, palace, shown)}")
     return "\n".join(lines)
 
 
@@ -208,7 +237,7 @@ def recall(prompt: str, session_id: str = "", searcher=None, cfg: Optional[dict]
     picked = select(results, cfg, seen, project)
     if remember and picked:
         _remember_seen(session_id, seen | {r["id"] for r in picked})
-    return format_note(picked) if picked else ""
+    return format_note(picked, palace=getattr(searcher, "palace", None)) if picked else ""
 
 
 def main() -> None:

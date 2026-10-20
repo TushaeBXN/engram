@@ -203,3 +203,22 @@ def test_recall_prefers_the_current_project(mem, tmp_path):
     assert "(billing/" in note and "(admin/" not in note
     anywhere = rc.recall("which auth sessions library do we use for login?", "s2", searcher, CFG)
     assert "(billing/" in anywhere and "(admin/" in anywhere  # no project: both qualify
+
+
+def test_a_corrected_memory_carries_what_it_replaced_and_why(mem):
+    palace, _, searcher, add = mem
+    old = add("Brian's coffee order is a cortado with oat milk at Juniper and Oak.", room="coffee")
+    new_id = correct_memory(palace, _backend_of(mem), old.id, "Brian now orders a flat white with almond milk at Copper Kettle.",
+                            reason="the old shop closed")["new"]["id"]
+    current = next(r for r in searcher.search("coffee order", n=5) if r["id"] == new_id)
+    note = rc.format_note([current], palace=palace)
+    line = note.splitlines()[1]
+    assert line.startswith("- CURRENT ") and '(before, until ' in line and "the old shop closed" in line
+    assert "cortado with oat milk" in line
+    both = rc.format_note(searcher.search("coffee order", n=5)[:2], palace=palace)
+    assert both.count("cortado") == 1                       # not repeated when the old one is listed too
+    assert "(before" not in rc.format_note([current])       # no palace, no history lookup
+
+
+def _backend_of(mem):
+    return mem[1]
