@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.10.3
+
+**Saved preferences are found when you ask for a choice.** In a live test the
+companion app had "Brian's favorite bakery is Rosewater Bakery and he always
+gets the lemon scone" saved, and "I'm picking up pastries before work
+tomorrow. Where should I go, and what should I get?" found nothing: that
+question scores 0.205 against the preference, under the 0.30 bar for facts,
+because a request for a choice rarely repeats the preference's words.
+Memories in the `preferences` hall now need only
+`recall_preference_min_relevance` (0.20). On `trust_eval.py`'s new
+`preferences` part (6 preferences, 9 questions that should find one, 12 that
+shouldn't), auto-recall finds 6 of 9 instead of 2 of 9, with one false alarm
+either way ("where should I park downtown tomorrow?"). It still misses
+questions that need reasoning (vegetarian -> choosing a restaurant); the
+setting can be raised or lowered, and 0.30 restores the old behaviour.
+
 ## 1.10.2
 
 **A recalled correction now says what it replaced, and why.** Found by running a

@@ -17,7 +17,9 @@
                 and evidence ledgers stay valid, is any update lost?
 4. compression Engram Shorthand (used for the wake-up note): size saved, and
                 whether names, numbers and identifiers survive a round trip.
-5. recall       A small synthetic indirect-question check (R@5). This is a smoke
+5. preferences  Does a question that doesn't repeat a saved preference's words ("where should I
+                get pastries?") still bring it up, without false alarms on unrelated questions?
+6. recall       A small synthetic indirect-question check (R@5). This is a smoke
                 test only: for real recall numbers use longmemeval_bench.py and
                 locomo_bench.py.
 
@@ -253,6 +255,64 @@ def worker_efficiency() -> dict:
     }
 
 
+PREFERENCES = [
+    "Brian's favorite bakery is Rosewater Bakery and he always gets the lemon scone.",
+    "Brian orders a flat white with almond milk at Copper Kettle.",
+    "Brian prefers window seats on flights and always books morning departures.",
+    "Brian is vegetarian and avoids anything with fish sauce.",
+    "Brian likes to run in the evening along the greenway, about five miles.",
+    "Brian prefers dark mode and a monospace font in every editor.",
+]
+# (question that should bring up PREFERENCES[i], i): asked in different words from the preference
+PREFERENCE_ASKS = [
+    ("I'm picking up pastries before work tomorrow. Where should I go, and what should I get?", 0),
+    ("Where should I grab a treat for the office on Friday?", 0),
+    ("I'm meeting a friend for coffee tomorrow. What should I order?", 1),
+    ("I need to book a trip to Denver next month, any tips on how to book it?", 2),
+    ("Taking the early flight out on Tuesday, where should I sit?", 2),
+    ("We're going out for dinner with clients, what should I order?", 3),
+    ("Can you suggest a restaurant for Saturday night?", 3),
+    ("I want to get some exercise after work, what should I do?", 4),
+    ("Set up my new laptop, what settings should I change in the editor?", 5),
+]
+# choice-style or general questions that no saved preference answers
+PREFERENCE_DECOYS = [
+    "Where should I go on vacation this summer?", "What should I get my sister for her birthday?",
+    "Which programming language should I learn next?", "How should I invest my savings?",
+    "What movie should I watch tonight?", "Where should I park downtown tomorrow?",
+    "What should I name my new puppy?", "Should I buy a house or keep renting?",
+    "explain how photosynthesis works", "what's the capital of Australia",
+    "write me a haiku about autumn", "how many ounces are in a pound",
+]
+
+
+def worker_preferences() -> dict:
+    """Does auto-recall bring up a saved preference when a question doesn't repeat its words?"""
+    from engram.chateau import Drawer
+    from engram.indexing import index_drawers
+    from engram.recall import recall
+
+    srv = _server()
+    items = []
+    for text in PREFERENCES:
+        d = Drawer(content=text, wing="brian", room="preference", hall="preferences")
+        srv.palace.save_drawer(d)
+        items.append((d.id, text, {"wing": "brian", "room": "preference", "hall": "preferences",
+                                   "timestamp": d.timestamp, "pinned": False}))
+    index_drawers(srv.backend, items)
+    out = {"preferences": len(PREFERENCES), "questions_that_should_find_one": len(PREFERENCE_ASKS),
+           "questions_with_no_matching_preference": len(PREFERENCE_DECOYS)}
+    for label, pref_bar in (("same bar as facts (0.30)", 0.30), ("default preference bar", None)):
+        cfg = {**srv.cfg, "recall": True}
+        if pref_bar is not None:
+            cfg["recall_preference_min_relevance"] = pref_bar
+        found = sum(PREFERENCES[i][:30] in recall(q, searcher=srv.searcher, cfg=cfg, remember=False)
+                    for q, i in PREFERENCE_ASKS)
+        false = sum(recall(q, searcher=srv.searcher, cfg=cfg, remember=False) != "" for q in PREFERENCE_DECOYS)
+        out[f"{label}: found / false alarms"] = f"{found}/{len(PREFERENCE_ASKS)} / {false}/{len(PREFERENCE_DECOYS)}"
+    return out
+
+
 def worker_recall() -> dict:
     srv = _server()
     _corpus(srv)
@@ -364,7 +424,8 @@ def worker_reliability(trials: int = 40) -> dict:
 
 
 WORKERS = {"integrity": worker_integrity, "efficiency": worker_efficiency,
-           "reliability": worker_reliability, "recall": worker_recall, "compression": worker_compression}
+           "reliability": worker_reliability, "recall": worker_recall, "compression": worker_compression,
+           "preferences": worker_preferences}
 
 
 # ---------------------------------------------------------------------------
@@ -408,7 +469,7 @@ def report(results: dict, backend: str) -> str:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--backend", default="chromadb", choices=["chromadb", "sqlitevec"])
-    ap.add_argument("--only", default="integrity,efficiency,reliability,compression,recall")
+    ap.add_argument("--only", default="integrity,efficiency,preferences,reliability,compression,recall")
     ap.add_argument("--json", help="also write the results here")
     ap.add_argument("--legacy-writes", action="store_true", help="reliability: use pre-1.10.1 plain file writes")
     ap.add_argument("--worker")

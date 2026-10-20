@@ -222,3 +222,15 @@ def test_a_corrected_memory_carries_what_it_replaced_and_why(mem):
 
 def _backend_of(mem):
     return mem[1]
+
+
+def test_saved_preferences_get_a_lower_relevance_bar_than_facts():
+    pref = {"id": "p", "text": "Brian's favorite bakery is Rosewater.", "semantic_score": 0.22,
+            "metadata": {"wing": "brian", "hall": "preferences"}}
+    fact = {"id": "f", "text": "The office printer is Gutenberg.", "semantic_score": 0.22,
+            "metadata": {"wing": "brian", "hall": "facts"}}
+    cfg = {"recall_min_relevance": 0.30}                       # preference bar defaults to 0.20
+    assert [r["id"] for r in rc.select([pref, fact], cfg)] == ["p"]
+    assert rc.select([pref], {**cfg, "recall_preference_min_relevance": 0.25}) == []
+    other = {**pref, "id": "q", "metadata": {"wing": "someone-else", "hall": "preferences"}}
+    assert rc.select([other], cfg, project="myapp") == []      # another project's still need the higher bar

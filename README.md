@@ -463,6 +463,7 @@ Everything works out of the box. If you want to tweak things, settings live in `
 | `reranker` | `false` | Local reranker; turn on with `engram setup-reranker`. While off, nothing extra is downloaded |
 | `recall` | `true` | Auto-recall in Claude Code (needs `engram install-hooks`); `false` turns it off |
 | `recall_max` / `recall_min_relevance` | `3` / `0.30` | At most this many memories per message, and how closely they must match (0 to 1) |
+| `recall_preference_min_relevance` | `0.20` | The same bar for saved preferences, lower because a request for a choice rarely repeats the preference's words |
 | `recall_exclude_wings` | `["library"]` | Wings auto-recall never shows |
 | `recall_other_min_relevance` | `0.55` | How closely another project's memories must match to be shown |
 | `projects` | `{}` | Map folders to wings when the folder name isn't what you want, e.g. `{"~/code/app": "billing"}` |
