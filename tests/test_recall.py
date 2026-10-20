@@ -234,3 +234,17 @@ def test_saved_preferences_get_a_lower_relevance_bar_than_facts():
     assert rc.select([pref], {**cfg, "recall_preference_min_relevance": 0.25}) == []
     other = {**pref, "id": "q", "metadata": {"wing": "someone-else", "hall": "preferences"}}
     assert rc.select([other], cfg, project="myapp") == []      # another project's still need the higher bar
+
+
+def test_the_best_matching_preference_keeps_a_slot_when_chatter_fills_the_rest():
+    def chat(i):
+        return {"id": f"c{i}", "text": f"chat {i}", "semantic_score": 0.4, "metadata": {"wing": "default", "hall": "facts"}}
+    pref = {"id": "p", "text": "Brian's favorite bakery is Rosewater.", "semantic_score": 0.22,
+            "metadata": {"wing": "brian", "hall": "preferences"}}
+    weaker = {**pref, "id": "p2", "semantic_score": 0.21}
+    picked = rc.select([chat(1), chat(2), chat(3), chat(4), weaker, pref], {"recall_max": 3})
+    assert [r["id"] for r in picked] == ["c1", "c2", "p"]          # chatter keeps two, the best preference one
+    assert [r["id"] for r in rc.select([chat(1), pref], {"recall_max": 3})] == ["c1", "p"]
+    low = {**pref, "semantic_score": 0.10}
+    assert [r["id"] for r in rc.select([chat(1), chat(2), chat(3), low], {"recall_max": 3})] == ["c1", "c2", "c3"]
+    assert rc.select([chat(1), chat(2), pref], {"recall_max": 3, "recall_exclude_wings": ["brian"]})[-1]["id"] == "c2"

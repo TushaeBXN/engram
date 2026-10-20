@@ -14,6 +14,8 @@ It is built to stay out of the way:
 * short messages and slash commands are skipped;
 * wings in ``recall_exclude_wings`` (default: the reference ``library``) are
   never shown;
+* saved preferences are also searched on their own, and the best matching one always keeps a slot,
+  so a big index of conversation logs can't crowd them out;
 * a saved preference needs only ``recall_preference_min_relevance`` (0.20), because a question
   asking for a choice rarely repeats the words of the preference it should find;
 * project-aware: memories from the project you're working in (Claude Code
@@ -169,6 +171,16 @@ def select(results: list[dict], cfg: dict, seen: set = frozenset(),
         picked.append(r)
         if len(picked) >= limit:
             break
+    # Conversation chatter can fill every slot; the best matching preference keeps one.
+    def is_pref(r: dict) -> bool:
+        return (r.get("metadata") or {}).get("hall") == "preferences"
+
+    if not any(is_pref(r) for r in picked):
+        best = max((r for r in results if is_pref(r) and r["id"] in relevant and r["id"] not in seen
+                    and (r.get("metadata") or {}).get("wing") not in excluded),
+                   key=lambda r: r.get("semantic_score", 0.0), default=None)
+        if best is not None:
+            picked = picked[:limit - 1] + [best]
     return picked
 
 
@@ -244,6 +256,12 @@ def recall(prompt: str, session_id: str = "", searcher=None, cfg: Optional[dict]
         results = searcher.search(prompt[:2000], n=limit * 4, wing=project, rerank=rerank)
     have = {r["id"] for r in results}
     results += [r for r in searcher.search(prompt[:2000], n=limit * 4, rerank=rerank) if r["id"] not in have]
+    # Preferences are searched on their own too: in a big index full of conversation logs, the
+    # words of a request ("work", "tomorrow", "go") match the logs better than the preference
+    # they should find, and the preference never reaches the top results.
+    have = {r["id"] for r in results}
+    results += [r for r in searcher.search(prompt[:2000], n=limit * 4, hall="preferences", rerank=rerank)
+                if r["id"] not in have]
     seen = _seen(session_id) if remember else set()
     picked = select(results, cfg, seen, project)
     if remember and picked:

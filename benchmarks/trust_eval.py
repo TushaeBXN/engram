@@ -286,6 +286,32 @@ PREFERENCE_DECOYS = [
 ]
 
 
+_CHAT_OPENERS = ["Working on", "Planning", "Let's talk about", "Quick update on", "Reminder about", "Thinking through"]
+_CHAT_THINGS = ["the work schedule", "tomorrow's plan", "what we should get done", "where to go next with the project",
+                "the things I need to get before work", "how to go about the review", "the meeting before work tomorrow",
+                "which place to go for the offsite", "the list of things to pick up", "how the day should go"]
+_CHAT_CLOSERS = ["I'll get back to it later.", "We should go over it again soon.", "Nothing decided yet.",
+                 "Maybe tomorrow works better.", "Let me know what you think I should do."]
+
+
+def _add_chatter(srv, count: int) -> None:
+    """Conversation-log-like notes that share everyday words ("work", "tomorrow", "go") with real questions."""
+    from engram.chateau import Drawer
+    from engram.indexing import index_drawers
+
+    rng = random.Random(3)
+    items = []
+    for i in range(count):
+        text = f"{rng.choice(_CHAT_OPENERS)} {rng.choice(_CHAT_THINGS)}. {rng.choice(_CHAT_CLOSERS)} (log {i})"
+        hall = rng.choice(["facts", "discoveries", "advice"])
+        d = Drawer(content=text, wing="default", room="chat", hall=hall)
+        srv.palace.save_drawer(d)
+        items.append((d.id, text, {"wing": "default", "room": "chat", "hall": hall, "timestamp": d.timestamp,
+                                   "pinned": False}))
+    for i in range(0, len(items), 250):
+        index_drawers(srv.backend, items[i:i + 250])
+
+
 def worker_preferences() -> dict:
     """Does auto-recall bring up a saved preference when a question doesn't repeat its words?"""
     from engram.chateau import Drawer
@@ -310,6 +336,14 @@ def worker_preferences() -> dict:
                     for q, i in PREFERENCE_ASKS)
         false = sum(recall(q, searcher=srv.searcher, cfg=cfg, remember=False) != "" for q in PREFERENCE_DECOYS)
         out[f"{label}: found / false alarms"] = f"{found}/{len(PREFERENCE_ASKS)} / {false}/{len(PREFERENCE_DECOYS)}"
+    crowd = int(os.environ.get("EVAL_CROWD", "2500"))
+    _add_chatter(srv, crowd)      # now bury them in conversation-log-like notes
+    cfg = {**srv.cfg, "recall": True}
+    found = sum(PREFERENCES[i][:30] in recall(q, searcher=srv.searcher, cfg=cfg, remember=False)
+                for q, i in PREFERENCE_ASKS)
+    false = sum(recall(q, searcher=srv.searcher, cfg=cfg, remember=False) != "" for q in PREFERENCE_DECOYS)
+    out[f"default, buried in {crowd:,} chatty notes: found / false alarms"] = (
+        f"{found}/{len(PREFERENCE_ASKS)} / {false}/{len(PREFERENCE_DECOYS)}")
     return out
 
 
@@ -472,9 +506,12 @@ def main() -> None:
     ap.add_argument("--only", default="integrity,efficiency,preferences,reliability,compression,recall")
     ap.add_argument("--json", help="also write the results here")
     ap.add_argument("--legacy-writes", action="store_true", help="reliability: use pre-1.10.1 plain file writes")
+    ap.add_argument("--crowd", type=int, help="preferences: how many chatty notes to bury them in (default 2500)")
     ap.add_argument("--worker")
     ap.add_argument("--writer", nargs=3, metavar=("HOME", "SEED", "BIG"))
     args = ap.parse_args()
+    if args.crowd:
+        os.environ["EVAL_CROWD"] = str(args.crowd)
     if args.writer:
         _writer(args.writer[0], int(args.writer[1]), args.writer[2] == "big")
         return

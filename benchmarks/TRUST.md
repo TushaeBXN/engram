@@ -85,6 +85,20 @@ habit, editor settings), 9 questions that should bring one up, and 12 that shoul
 | Same as facts (0.30; before 1.10.3) | 2 / 9 | 1 |
 | **Preference bar 0.20 (default)** | **6 / 9** | **1** |
 
+**Buried in a large index.** The same preferences hidden among 2,500 conversation-log-like notes that
+share everyday words with the questions ("work", "tomorrow", "go"), which is what a companion app's
+chat history looks like:
+
+| Version | Preference found | False alarms (of 12) |
+|---|---|---|
+| 1.10.3 (preferences compete with everything) | 2 / 9 | 3 |
+| **1.10.4 (preferences also searched on their own; best match keeps a slot)** | **4 / 9** | **3** |
+
+The 3 false alarms there come from the chatter itself, which was written to resemble questions, not
+from the preferences. This index is deliberately hostile: a real chat history scores lower against a
+question, and the companion app skips its own conversation logs when recalling. On a real index of
+10,778 chunks the bakery preference still missed the top results until those logs were skipped.
+
 The one false alarm either way is "where should I park downtown tomorrow?". The 3 still
 missed need reasoning, not wording ("we're taking clients to dinner" -> "vegetarian").
 A live test of the companion app found this: "I'm picking up pastries before work tomorrow"
