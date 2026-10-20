@@ -7,6 +7,7 @@ name ends in ``.gz``) holding:
   any fields this version does not know about),
 * wing and room descriptions, closets (short summaries) and tunnels,
 * the lineage ledger (what replaced what, when and why),
+* the evidence ledger (which memories rest on which),
 * provenance records,
 * the knowledge graph (every triple, with its validity dates),
 * the identity text and agent profiles and diaries.
@@ -35,6 +36,7 @@ from typing import Optional
 
 from engram.chateau import RESERVED_DIRS, Chateau, Drawer, InvalidNameError, validate_name
 from engram.lineage import LINEAGE_FILE, Lineage, LineageError, validate_links
+from engram.relations import Relations, validate_relations
 
 FORMAT = "engram-backup"
 VERSION = 1
@@ -75,7 +77,7 @@ def collect(chateau: Chateau, kg_path: Optional[Path] = None, identity_path: Opt
         "format": FORMAT, "version": VERSION, "engram_version": __version__,
         "exported_at": datetime.now(timezone.utc).isoformat(),
         "wings": [], "rooms": [], "drawers": [], "closets": [], "tunnels": {},
-        "lineage": [], "provenance": [], "knowledge_graph": [], "identity": None, "agents": {},
+        "lineage": [], "relations": [], "provenance": [], "knowledge_graph": [], "identity": None, "agents": {},
     }
     for p in sorted(root.glob("*/wing.json")):
         data["wings"].append(_read_json(p))
@@ -92,6 +94,7 @@ def collect(chateau: Chateau, kg_path: Optional[Path] = None, identity_path: Opt
     for p in sorted(root.glob("*/tunnels.json")):
         data["tunnels"][p.parent.name] = _read_json(p)
     data["lineage"] = Lineage(root).links()
+    data["relations"] = Relations(root).links()
     for p in sorted((root / "provenance").glob("*.json")):
         data["provenance"].append(_read_json(p))
     if kg_path and Path(kg_path).exists():
@@ -131,6 +134,7 @@ def summary(data: dict) -> dict:
     return {
         "drawers": len(data.get("drawers", [])),
         "lineage_links": len(data.get("lineage", [])),
+        "evidence_links": len(data.get("relations", [])),
         "kg_triples": len(data.get("knowledge_graph", [])),
         "wings": len(data.get("wings", [])),
         "rooms": len(data.get("rooms", [])),
@@ -232,6 +236,23 @@ def plan_import(data: dict, chateau: Chateau, overwrite: bool = False) -> dict:
     except LineageError as exc:
         problems.append(f"lineage: {exc}")
 
+    current_rel = Relations(chateau.path).links()
+    have_rel = {(lk["kind"], lk["from"], lk["to"]) for lk in current_rel}
+    new_rel = []
+    for lk in data.get("relations") or []:  # absent in backups from before 1.9
+        if not isinstance(lk, dict):
+            problems.append(f"evidence link {lk!r}: not an object")
+            continue
+        key = (lk.get("kind"), lk.get("from"), lk.get("to"))
+        if key not in have_rel:
+            new_rel.append(lk)
+            have_rel.add(key)
+    merged_rel = current_rel + new_rel
+    try:
+        validate_relations(merged_rel, known_ids=set(existing) | seen)
+    except LineageError as exc:
+        problems.append(f"evidence links: {exc}")
+
     for kind, items in (("wing", data.get("wings") or []), ("room", data.get("rooms") or [])):
         for item in items:
             if not isinstance(item, dict) or not isinstance(item.get("name"), str):
@@ -270,7 +291,8 @@ def plan_import(data: dict, chateau: Chateau, overwrite: bool = False) -> dict:
 
     if problems:
         raise BackupError(problems)
-    return {"drawers": to_write, "skipped": skipped, "links": new_links, "merged_links": merged_links}
+    return {"drawers": to_write, "skipped": skipped, "links": new_links, "merged_links": merged_links,
+            "relations": new_rel, "merged_relations": merged_rel}
 
 
 def import_backup(src, chateau: Chateau, backend=None, kg_path: Optional[Path] = None,
@@ -284,7 +306,8 @@ def import_backup(src, chateau: Chateau, backend=None, kg_path: Optional[Path] =
     data = src if isinstance(src, dict) else load_backup(src)
     plan = plan_import(data, chateau, overwrite=overwrite)
     report = {"drawers_added": len(plan["drawers"]), "drawers_skipped": plan["skipped"],
-              "lineage_links_added": len(plan["links"]), "kg_triples_added": 0, "dry_run": dry_run}
+              "lineage_links_added": len(plan["links"]), "evidence_links_added": len(plan["relations"]),
+              "kg_triples_added": 0, "dry_run": dry_run}
     if dry_run:
         report["kg_triples_in_backup"] = len(data.get("knowledge_graph") or [])
         return report
@@ -329,6 +352,8 @@ def import_backup(src, chateau: Chateau, backend=None, kg_path: Optional[Path] =
             p.write_text(json.dumps(rec, indent=2))
     if plan["links"]:
         Lineage(root).replace_all(plan["merged_links"])
+    if plan["relations"]:
+        Relations(root).replace_all(plan["merged_relations"])
 
     if kg_path and data.get("knowledge_graph"):
         from engram.knowledge_graph import KnowledgeGraph

@@ -1,4 +1,4 @@
-"""Engram MCP Server — 27 tools for Claude, Cursor, VS Code, Gemini, Codex and any MCP client.
+"""Engram MCP Server — 31 tools for Claude, Cursor, VS Code, Gemini, Codex and any MCP client.
 
 Implements the Model Context Protocol over stdio.  Start with::
 
@@ -6,7 +6,7 @@ Implements the Model Context Protocol over stdio.  Start with::
 
 All tools are prefixed ``engram_``.
 
-Tool list (27):
+Tool list (31):
     1.  engram_search          — semantic search
     2.  engram_add_memory      — store a new drawer
     3.  engram_wake_up         — return L0+L1 context
@@ -34,6 +34,10 @@ Tool list (27):
     25. engram_dispute         — mark two memories as conflicting, undecided
     26. engram_history         — a memory's status and replacement history
     27. engram_recall          — the few memories clearly relevant to a message (auto-recall)
+    28. engram_link            — based_on / derived_from / contradicts / supersedes between memories
+    29. engram_source          — record where a memory came from
+    30. engram_why             — explain a memory: source, evidence, history, conflicts, relevance
+    31. engram_check           — what needs review: corrected evidence, unsupported inferences, conflicts
 
 On connect, the server also sends ``instructions`` (MCP InitializeResult) so
 clients that pass them to the model know to check memory first.
@@ -79,8 +83,20 @@ INSTRUCTIONS = (
     "it returns only clearly relevant memories, or says nothing matched. "
     "When the user makes a decision or states a lasting fact or preference, save it with "
     "engram_add_memory. When something changed, call engram_correct on the old memory instead of "
-    "adding a contradicting one. Memories marked OUTDATED are history: use the current version."
+    "adding a contradicting one. Memories marked OUTDATED are history: use the current version. "
+    "Say where a memory came from with 'source' (user, primary, secondary, tool, inference) and, when "
+    "you save a conclusion, link it to the memories it rests on with 'based_on'. When asked why you "
+    "believe something, or before relying on a conclusion, call engram_why: it shows the evidence, "
+    "whether that evidence has since been corrected, and what is inference rather than record."
 )
+
+_SOURCE_PROPS = {
+    "source": {"type": "string", "enum": ["user", "primary", "secondary", "tool", "inference"],
+               "description": ("Where it came from: user (the person said it), primary (original "
+                               "document, law, ruling, data), secondary (reporting or analysis), "
+                               "tool (search or program output), inference (your own conclusion)")},
+    "source_ref": {"type": "string", "description": "Citation, URL or document it came from"},
+}
 
 TOOLS: list[dict] = [
     {
@@ -113,6 +129,11 @@ TOOLS: list[dict] = [
                 "pinned": {"type": "boolean", "default": False},
                 "supersedes": {"type": "string", "description": "ID of a memory this one replaces (optional)"},
                 "reason": {"type": "string", "description": "Why it replaces it (used with 'supersedes')"},
+                **_SOURCE_PROPS,
+                "based_on": {"type": "array", "items": {"type": "string"},
+                             "description": "IDs of memories that are evidence for this one"},
+                "derived_from": {"type": "array", "items": {"type": "string"},
+                                 "description": "IDs of memories this one was inferred from"},
             },
             "required": ["content"],
         },
@@ -369,6 +390,9 @@ TOOLS: list[dict] = [
                 "memory_id": {"type": "string", "description": "ID (or unique prefix) of the outdated memory"},
                 "content": {"type": "string", "description": "The corrected, current information"},
                 "reason": {"type": "string", "description": "Why it changed"},
+                **_SOURCE_PROPS,
+                "based_on": {"type": "array", "items": {"type": "string"},
+                             "description": "IDs of memories that support the corrected version"},
             },
             "required": ["memory_id", "content"],
         },
@@ -412,6 +436,56 @@ TOOLS: list[dict] = [
             "required": ["memory_id"],
         },
     },
+    {
+        "name": "engram_link",
+        "description": ("Record how two stored memories relate: 'memory_id <relation> target_id'. "
+                        "based_on: target is evidence for memory. derived_from: memory was inferred "
+                        "from target. contradicts: they conflict, undecided. supersedes: memory "
+                        "replaces target. undo=true removes the link. Safe to retry."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "memory_id": {"type": "string"},
+                "relation": {"type": "string", "enum": ["based_on", "derived_from", "contradicts", "supersedes"]},
+                "target_id": {"type": "string"},
+                "reason": {"type": "string"},
+                "undo": {"type": "boolean", "default": False},
+            },
+            "required": ["memory_id", "relation", "target_id"],
+        },
+    },
+    {
+        "name": "engram_source",
+        "description": "Record where a stored memory came from (and optionally the citation or URL).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"memory_id": {"type": "string"}, **_SOURCE_PROPS},
+            "required": ["memory_id", "source"],
+        },
+    },
+    {
+        "name": "engram_why",
+        "description": ("Explain a memory: where it came from, when, whether it is record or "
+                        "inference, the evidence it rests on (and whether that evidence was since "
+                        "corrected or disputed), earlier versions and their evidence, conflicts, "
+                        "and, given the query, why search ranked it. Use it before relying on a "
+                        "conclusion or when asked to justify one."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "memory_id": {"type": "string"},
+                "query": {"type": "string", "description": "The question it was retrieved for (optional)"},
+            },
+            "required": ["memory_id"],
+        },
+    },
+    {
+        "name": "engram_check",
+        "description": ("Memory maintenance report: conclusions whose evidence was corrected or "
+                        "disputed, inferences with no evidence, unresolved conflicts, broken "
+                        "links. Changes nothing."),
+        "inputSchema": {"type": "object", "properties": {}},
+    },
 ]
 
 
@@ -453,13 +527,18 @@ class EngramMCPServer:
         return self.searcher.search(query, n=n, wing=wing, room=room, no_decay=no_decay)
 
     def _tool_engram_add_memory(self, content, wing="default", room="general", hall="facts", pinned=False,
-                                supersedes=None, reason=""):
+                                supersedes=None, reason="", source="", source_ref="", based_on=None,
+                                derived_from=None):
         from engram.chateau import Drawer
         from engram.indexing import index_drawer
         from engram.lineage import possible_updates, supersede_memory
-        if supersedes:  # fail before saving anything if the link would be refused
+        from engram.relations import attach_evidence, check_source, resolve_evidence
+        # Check everything that could be refused before saving anything.
+        if supersedes:
             self.palace.find_drawer(supersedes) or self._missing(supersedes)
-        drawer = Drawer(content=content, wing=wing, room=room, hall=hall, pinned=pinned)
+        evidence = resolve_evidence(self.palace, based_on, derived_from)
+        drawer = Drawer(content=content, wing=wing, room=room, hall=hall, pinned=pinned,
+                        source=check_source(source), source_ref=source_ref)
         self.palace.save_drawer(drawer)
         index_drawer(self.backend, drawer.id, drawer.content, {
             "wing": wing, "room": room, "hall": hall,
@@ -477,6 +556,8 @@ class EngramMCPServer:
                 raise
         else:
             result["possible_updates"] = possible_updates(self.backend, self.palace, drawer)
+        if evidence:
+            result["evidence"] = attach_evidence(self.palace, drawer.id, evidence, by="mcp")
         return result
 
     @staticmethod
@@ -491,9 +572,31 @@ class EngramMCPServer:
                       remember=False, cwd=cwd)
         return note or "Nothing in memory is clearly relevant to this."
 
-    def _tool_engram_correct(self, memory_id, content, reason=""):
+    def _tool_engram_correct(self, memory_id, content, reason="", source="", source_ref="", based_on=None):
         from engram.lineage import correct_memory
-        return correct_memory(self.palace, self.backend, memory_id, content, reason=reason, by="mcp")
+        from engram.relations import attach_evidence, check_source, resolve_evidence
+        evidence = resolve_evidence(self.palace, based_on)
+        result = correct_memory(self.palace, self.backend, memory_id, content, reason=reason, by="mcp",
+                                source=check_source(source), source_ref=source_ref)
+        if evidence:
+            result["evidence"] = attach_evidence(self.palace, result["new"]["id"], evidence, by="mcp")
+        return result
+
+    def _tool_engram_link(self, memory_id, relation, target_id, reason="", undo=False):
+        from engram.relations import link_memories
+        return link_memories(self.palace, memory_id, relation, target_id, reason=reason, by="mcp", undo=undo)
+
+    def _tool_engram_source(self, memory_id, source, source_ref=""):
+        from engram.relations import set_source
+        return set_source(self.palace, memory_id, source, source_ref)
+
+    def _tool_engram_why(self, memory_id, query=None):
+        from engram.relations import explain
+        return explain(self.palace, memory_id, query=query, searcher=self.searcher)
+
+    def _tool_engram_check(self):
+        from engram.relations import check
+        return check(self.palace)
 
     def _tool_engram_supersede(self, old_id, new_id=None, reason="", undo=False):
         from engram.lineage import Lineage, LineageError, supersede_memory

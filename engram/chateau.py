@@ -81,10 +81,17 @@ class Drawer:
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     tags: list[str] = field(default_factory=list)
     compressed: bool = False
+    # Where it came from: user, primary, secondary, tool or inference (see relations.py).
+    source: str = ""
+    source_ref: str = ""   # citation, URL or document the memory was taken from
 
     # ------------------------------------------------------------------
     def to_dict(self) -> dict:
-        return asdict(self)
+        d = asdict(self)
+        for key in ("source", "source_ref"):  # unset: keep the file as older versions wrote it
+            if not d[key]:
+                del d[key]
+        return d
 
     @classmethod
     def from_dict(cls, d: dict) -> Drawer:

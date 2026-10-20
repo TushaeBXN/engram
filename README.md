@@ -105,7 +105,7 @@ It adds Engram to that app's settings (keeping everything else, with a `.bak` ba
 | Codex CLI | `~/.codex/config.toml` |
 | Zed, LM Studio | prints the snippet to paste |
 
-Every app then has 27 `engram_*` tools: recall, search, remember, correct an outdated memory, a topic's history, a knowledge graph of people and facts, and more. On connect, Engram also tells the AI how to use them: check memory before answering anything that depends on past work, save decisions, and correct rather than contradict. (Apps decide whether to pass that guidance to the model; most current ones do.) Ask *"remember that we use tabs in this repo"*, *"what did we decide about auth?"* or *"we moved to PostgreSQL, update that"*.
+Every app then has 31 `engram_*` tools: recall, search, remember, correct an outdated memory, link a conclusion to its evidence, explain why a memory says what it says, a topic's history, a knowledge graph of people and facts, and more. On connect, Engram also tells the AI how to use them: check memory before answering anything that depends on past work, save decisions, and correct rather than contradict. (Apps decide whether to pass that guidance to the model; most current ones do.) Ask *"remember that we use tabs in this repo"*, *"what did we decide about auth?"* or *"we moved to PostgreSQL, update that"*.
 
 **Claude Code** gets the most: memory that works without being asked.
 
@@ -209,6 +209,38 @@ $ engram search "which database does the app use"
 
 Engram never decides by itself that one note contradicts another. Deciding what is true is the job of whoever is using it. When Claude saves a memory, Engram points out existing memories it might update, and Claude decides.
 
+### Why does it say that?
+
+A memory can say what it rests on and where it came from, so a conclusion never floats free of its evidence:
+
+```bash
+engram source 903294e5 primary --ref "U.S. Const. art. I, § 2"   # where a memory came from
+engram link c9422f65 based_on 903294e5 --reason "constitutional text"
+engram link c9422f65 derived_from 2da14213                       # also: contradicts, supersedes
+```
+
+Sources are `user` (you said it), `primary` (an original document, law, ruling or dataset), `secondary` (reporting or analysis), `tool` (a search or program result) and `inference` (an AI's own conclusion). Inferences stay labelled as inferences.
+
+`engram why <id>` explains any memory: its source and date, whether it is a record or an inference, the evidence behind it, whether that evidence has since been corrected or disputed, earlier versions and *their* evidence, and, with `--query`, why search ranked it:
+
+```text
+$ engram why c9422f65
+c9422f65-…  amy/views  2026-10-20
+  My view: population apportionment is the baseline; the 2025 map changes the state's representation.
+  Source: AI inference.  Type: an inference.
+
+Evidence
+  based_on 903294e5  2026-10-20  primary source, U.S. Const. art. I, § 2
+    Article I, Section 2: Representatives shall be apportioned among the several States…
+  derived_from 2da14213  2026-10-20  secondary source  OUTDATED → 914e0cb2
+    Report: the legislature adopted a new map in 2025.
+
+Needs review
+  • evidence 2da14213 was corrected (current version: 914e0cb2); check whether this still holds
+```
+
+`engram check` lists everything like that across your memory: conclusions whose evidence was corrected or disputed, inferences with no evidence, conflicts nobody has settled, links to deleted memories. It changes nothing. When a position is revised, the old one keeps the evidence it had, so you can always see what the earlier view rested on and what supports the new one.
+
 **Backups.** `engram export backup.json.gz` puts every memory, correction, knowledge-graph fact and diary into one file. `engram import backup.json.gz` restores it on another computer, after checking the whole file first: if anything is wrong, nothing is changed. The format is documented in [docs/backup-format.md](docs/backup-format.md).
 
 ---
@@ -291,6 +323,7 @@ engram replay --room auth-migration                # a topic's history, in order
 # Fix and keep things
 engram correct <id> "the new, correct version"     # replace an outdated memory (old one kept as history)
 engram history <id>                                # what replaced what, when and why
+engram why <id>                                    # where it came from, what it rests on, what changed
 engram export backup.json.gz                       # back up everything to one file
 engram import backup.json.gz                       # restore it (checked first; safe to repeat)
 
@@ -348,12 +381,29 @@ engram kg timeline "auth-migration"
 engram graph [--wing W] [--output file.png]   # needs: pip install "engram-chateau[viz]"
 ```
 
-### Corrections and backups
+### Corrections
 ```bash
 engram correct <id> "new text" [--reason "why"]  # save a correction that replaces <id>
 engram supersede <old-id> <new-id> [--reason R]  # mark an existing memory as replacing another
 engram supersede <old-id> --undo                 # make <old-id> current again
 engram history <id>                              # status and full replacement history
+engram correct <id> "text" --source primary --ref "cite" --based-on <evidence-id>
+```
+
+### Evidence and explanations
+```bash
+engram link <id> based_on <evidence-id> [--reason R]   # <evidence-id> supports <id>
+engram link <id> derived_from <other-id>               # <id> was inferred from <other-id>
+engram link <id> contradicts <other-id>                # conflict, undecided
+engram link <id> supersedes <old-id>                   # <id> replaces <old-id>
+engram link <id> based_on <evidence-id> --undo         # remove a link
+engram source <id> user|primary|secondary|tool|inference [--ref "citation or URL"]
+engram why <id> [--query "the question"] [--json]      # explain a memory
+engram check [--json]                                  # what needs review; changes nothing
+```
+
+### Backups
+```bash
 engram export <file>[.gz]                        # back up everything to one file
 engram import <file> [--dry-run] [--overwrite]   # restore; the whole file is checked first
 ```
@@ -453,9 +503,10 @@ compress("The authentication module is a critical component that has a dependenc
 | `engram/reranker.py` | Optional local reranker (ONNX) |
 | `engram/miner.py`, `engram/convo_miner.py` | Saving files and conversations |
 | `engram/lineage.py` | Corrections: which memories are current, which were replaced, and why |
+| `engram/relations.py` | Evidence links, sources, `engram why` and `engram check` |
 | `engram/backup.py` | `engram export` / `engram import` |
 | `engram/recall.py` | Auto-recall hook for Claude Code |
-| `engram/mcp_server.py` | MCP server (27 tools), run as `engram-mcp` |
+| `engram/mcp_server.py` | MCP server (31 tools), run as `engram-mcp` |
 | `engram/connect.py` | `engram connect`: adds Engram to AI apps' settings |
 | `engram/layers.py`, `engram/shorthand.py` | Wake-up note and ES shorthand |
 | `engram/knowledge_graph.py`, `engram/agents.py` | Knowledge graph and agent diaries |

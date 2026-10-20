@@ -46,6 +46,29 @@ FORMAT_VERSION = 1
 _THREAD_LOCK = threading.Lock()
 
 
+@contextmanager
+def _locked_dir(directory: Path, name: str):
+    """Exclusive lock for writing the ledger *name* in *directory*."""
+    directory.mkdir(parents=True, exist_ok=True)
+    with _THREAD_LOCK, open(directory / (name + ".lock"), "w") as fh:
+        if fcntl:
+            fcntl.flock(fh, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            if fcntl:
+                fcntl.flock(fh, fcntl.LOCK_UN)
+
+
+def _write_atomic(path: Path, data: dict) -> None:
+    tmp = path.with_suffix(".json.tmp")
+    with open(tmp, "w") as fh:
+        json.dump(data, fh, indent=2)
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(tmp, path)
+
+
 class LineageError(ValueError):
     """A requested link would break the history (cycle, double replacement, unknown memory)."""
 
@@ -176,25 +199,11 @@ class Lineage:
     # Writing
     # ------------------------------------------------------------------
 
-    @contextmanager
     def _locked(self):
-        self.dir.mkdir(parents=True, exist_ok=True)
-        with _THREAD_LOCK, open(self.dir / (LINEAGE_FILE + ".lock"), "w") as fh:
-            if fcntl:
-                fcntl.flock(fh, fcntl.LOCK_EX)
-            try:
-                yield
-            finally:
-                if fcntl:
-                    fcntl.flock(fh, fcntl.LOCK_UN)
+        return _locked_dir(self.dir, LINEAGE_FILE)
 
     def _write(self, links: list[dict]) -> None:
-        tmp = self.path.with_suffix(".json.tmp")
-        with open(tmp, "w") as fh:
-            json.dump({"format": "engram-lineage", "version": FORMAT_VERSION, "links": links}, fh, indent=2)
-            fh.flush()
-            os.fsync(fh.fileno())
-        os.replace(tmp, self.path)
+        _write_atomic(self.path, {"format": "engram-lineage", "version": FORMAT_VERSION, "links": links})
         self._cache = None
 
     def supersede(self, old_id: str, new_id: str, reason: str = "", by: str = "") -> tuple[dict, bool]:
@@ -239,6 +248,29 @@ class Lineage:
             links.append(link)
             self._write(links)
             return link, True
+
+    def undispute(self, a: str, b: str) -> bool:
+        """Remove the conflict mark between *a* and *b*. Returns False if there was none."""
+        with self._locked():
+            links = self.links()
+            kept = [lk for lk in links if not (lk["kind"] == "disputes" and {lk["old"], lk["new"]} == {a, b})]
+            if len(kept) == len(links):
+                return False
+            self._write(kept)
+            return True
+
+    def earlier_versions(self, memory_id: str) -> list[dict]:
+        """The supersedes links leading up to *memory_id*, newest first."""
+        links = [lk for lk in self.links() if lk["kind"] == "supersedes"]
+        out, frontier, seen = [], [memory_id], {memory_id}
+        while frontier:
+            node = frontier.pop(0)
+            for lk in reversed(links):
+                if lk["new"] == node and lk["old"] not in seen:
+                    seen.add(lk["old"])
+                    out.append(lk)
+                    frontier.append(lk["old"])
+        return out
 
     def restore(self, old_id: str) -> bool:
         """Undo the replacement of *old_id*, making it current again.
@@ -349,8 +381,13 @@ def supersede_memory(chateau, old_id: str, new_id: str, reason: str = "", by: st
     return {"link": link, "created": created, "old": _summary(old), "new": _summary(new)}
 
 
-def correct_memory(chateau, backend, old_id: str, content: str, reason: str = "", by: str = "") -> dict:
+def correct_memory(chateau, backend, old_id: str, content: str, reason: str = "", by: str = "",
+                   source: str = "", source_ref: str = "") -> dict:
     """Save *content* as a new memory that replaces *old_id*, in the same wing/room/hall.
+
+    The correction keeps the old memory's source unless *source* is given.
+    Evidence links are not copied: the old version keeps the evidence it had,
+    and the agent links the new version to whatever supports it now.
 
     All or nothing: if the link cannot be recorded, the new memory is removed
     again. Retrying with the same content returns the existing correction
@@ -371,7 +408,8 @@ def correct_memory(chateau, backend, old_id: str, content: str, reason: str = ""
             return {"link": link, "created": False, "old": _summary(old), "new": _summary(existing)}
         raise LineageError(f"{old.id} was already replaced by {info['superseded_by']}; "
                            "correct that one instead")
-    new = Drawer(content=content, wing=old.wing, room=old.room, hall=old.hall, tags=list(old.tags))
+    new = Drawer(content=content, wing=old.wing, room=old.room, hall=old.hall, tags=list(old.tags),
+                 source=source or old.source, source_ref=source_ref or ("" if source else old.source_ref))
     chateau.save_drawer(new)
     try:
         index_drawer(backend, new.id, new.content, {
