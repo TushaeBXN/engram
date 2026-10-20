@@ -238,7 +238,8 @@ def worker_efficiency() -> dict:
         c = {**cfg, "recall_min_relevance": bar, "recall_other_min_relevance": max(bar, 0.55)}
         got = sum(key in recall(q, searcher=srv.searcher, cfg=c, remember=False).lower() for _, q, key in FACTS)
         said = sum(recall(q, searcher=srv.searcher, cfg=c, remember=False) != "" for q in UNRELATED)
-        sweep.append(f"bar {bar:.2f}: answer present {got}/{len(FACTS)}, spoke on {said}/{len(UNRELATED)} unrelated")
+        mark = "   <- default" if abs(bar - float(cfg.get("recall_min_relevance", 0.30))) < 1e-9 else ""
+        sweep.append(f"bar {bar:.2f}: answer present {got}/{len(FACTS)}, spoke on {said}/{len(UNRELATED)} unrelated{mark}")
     silent = sum(recall(q, searcher=srv.searcher, cfg=cfg, remember=False) == "" for q in UNRELATED)
     wake = srv.stack.wake_up(rebuild_l1=True)
     n = len(FACTS)
@@ -247,7 +248,7 @@ def worker_efficiency() -> dict:
         **{f"{k}_mean_tokens": round(sum(v) / n) for k, v in rows.items()},
         **{f"{k}_answer_present": hit[k] / n for k in rows},
         "unrelated_questions_answered_with_silence": f"{silent}/{len(UNRELATED)}",
-        "relevance_bar_sweep (default 0.35)": sweep,
+        "relevance_bar_sweep": sweep,
         "wake_up_tokens": est_tokens(wake),
     }
 
