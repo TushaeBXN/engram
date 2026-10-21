@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.10.5
+
+**`engram forget` deletes a memory for good.** It first shows what would change
+(a memory that had been replaced becomes current again, and anything resting on
+it loses that evidence). With `--yes` it removes the memory, its search entries,
+its provenance record and every correction, conflict and evidence link that
+mentioned it. The MCP delete tool now cleans up the same links. Found when a
+test run left fictional preferences in a real memory.
+
 ## 1.10.4
 
 **Saved preferences are no longer crowded out of a big index.** A live test with
