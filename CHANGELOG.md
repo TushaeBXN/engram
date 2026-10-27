@@ -2,6 +2,15 @@
 
 ## 1.10.6
 
+**Faster, and safer under concurrent use.** `engram check` on a 1,200-memory
+château with 600 evidence links and 200 corrections went from 1.6 s to 0.1 s
+with identical output: it now lists the château once instead of searching it
+for every memory, and `status` / `evidence` / `dependents` use lookup tables
+instead of scanning every link (`status` runs for every search result). The
+link files are re-read whenever another process rewrites them (the cache used
+to compare only the modification time, which could miss two writes in quick
+succession).
+
 **Deleting evidence no longer hides that a conclusion lost it.** Before, `engram
 forget` removed the link from a conclusion to its deleted evidence, so the
 conclusion quietly turned into an unsupported claim and `engram check` said

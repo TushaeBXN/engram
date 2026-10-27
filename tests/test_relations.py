@@ -235,3 +235,11 @@ def test_check_follows_stale_evidence_up_the_chain(server):
     stale = {i["memory"]["id"]: i for i in check(server.palace)["stale_support"]}
     assert stale[finding]["problem"] == "superseded"
     assert stale[plan_]["problem"] == "upstream" and stale[plan_]["through"] == [finding]
+
+
+def test_a_second_writer_is_never_hidden_by_the_cache(tmp_path):
+    a, b = Relations(tmp_path), Relations(tmp_path)
+    a.add("based_on", "x" * 8, "y" * 8)
+    assert len(b.links()) == 1                      # b caches this version
+    a.add("based_on", "z" * 8, "y" * 8)             # same size class, written right away
+    assert len(b.links()) == 2 and len(b.dependents("y" * 8)) == 2

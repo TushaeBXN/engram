@@ -121,7 +121,8 @@ class Lineage:
     def __init__(self, chateau_path: Path) -> None:
         self.dir = Path(chateau_path).expanduser()
         self.path = self.dir / LINEAGE_FILE
-        self._cache: Optional[tuple[float, list[dict]]] = None
+        self._cache: Optional[tuple[tuple, list[dict]]] = None
+        self._index_cache: Optional[tuple[list[dict], dict]] = None
 
     # ------------------------------------------------------------------
     # Reading
@@ -130,15 +131,32 @@ class Lineage:
     def links(self) -> list[dict]:
         """All recorded links, oldest first."""
         try:
-            mtime = self.path.stat().st_mtime
+            st = self.path.stat()
         except FileNotFoundError:
             return []
-        if self._cache and self._cache[0] == mtime:
+        stamp = (st.st_mtime_ns, st.st_size, st.st_ino)  # a rewrite by another process changes at least one
+        if self._cache and self._cache[0] == stamp:
             return self._cache[1]
         data = json.loads(self.path.read_text())
         links = list(data.get("links", []))
-        self._cache = (mtime, links)
+        self._cache = (stamp, links)
         return links
+
+    def _index(self, links: list[dict]) -> dict:
+        """Lookups over *links*, built once per version of the ledger so ``status`` is not a full scan."""
+        if self._index_cache and self._index_cache[0] is links:
+            return self._index_cache[1]
+        replaced, disputes, supersedes = {}, {}, {}
+        for lk in links:
+            if lk["kind"] == "supersedes":
+                replaced[lk["old"]] = lk
+                supersedes.setdefault(lk["new"], []).append(lk["old"])
+            elif lk["kind"] == "disputes":
+                disputes.setdefault(lk["old"], set()).add(lk["new"])
+                disputes.setdefault(lk["new"], set()).add(lk["old"])
+        index = {"replaced": replaced, "disputes": disputes, "supersedes": supersedes}
+        self._index_cache = (links, index)
+        return index
 
     def _replaced_by(self, links: list[dict]) -> dict[str, dict]:
         return {link["old"]: link for link in links if link["kind"] == "supersedes"}
@@ -151,11 +169,10 @@ class Lineage:
              "current_id": id of the newest memory in its chain,
              "supersedes": [ids it replaced], "disputed_with": [ids]}
         """
-        links = self.links()
-        replaced = self._replaced_by(links)
+        index = self._index(self.links())
+        replaced = index["replaced"]
         link = replaced.get(memory_id)
-        disputed = sorted({lk["new"] if lk["old"] == memory_id else lk["old"] for lk in links
-                           if lk["kind"] == "disputes" and memory_id in (lk["old"], lk["new"])})
+        disputed = sorted(index["disputes"].get(memory_id, ()))
         status = "superseded" if link else ("disputed" if disputed else "current")
         return {
             "status": status,
@@ -163,7 +180,7 @@ class Lineage:
             "replaced_at": link["at"] if link else None,
             "reason": link.get("reason") if link else None,
             "current_id": self._head(memory_id, replaced),
-            "supersedes": [lk["old"] for lk in links if lk["kind"] == "supersedes" and lk["new"] == memory_id],
+            "supersedes": list(index["supersedes"].get(memory_id, ())),
             "disputed_with": disputed,
         }
 

@@ -43,6 +43,7 @@ import json
 from pathlib import Path
 from typing import Optional
 
+from engram.chateau import Drawer
 from engram.lineage import (
     Lineage,
     LineageError,
@@ -100,27 +101,41 @@ class Relations:
     def __init__(self, chateau_path: Path) -> None:
         self.dir = Path(chateau_path).expanduser()
         self.path = self.dir / RELATIONS_FILE
-        self._cache: Optional[tuple[float, list[dict]]] = None
+        self._cache: Optional[tuple[tuple, list[dict]]] = None
+        self._index_cache: Optional[tuple[list[dict], tuple[dict, dict]]] = None
 
     def links(self) -> list[dict]:
         """All evidence links, oldest first."""
         try:
-            mtime = self.path.stat().st_mtime
+            st = self.path.stat()
         except FileNotFoundError:
             return []
-        if self._cache and self._cache[0] == mtime:
+        stamp = (st.st_mtime_ns, st.st_size, st.st_ino)  # a rewrite by another process changes at least one
+        if self._cache and self._cache[0] == stamp:
             return self._cache[1]
         links = list(json.loads(self.path.read_text()).get("links", []))
-        self._cache = (mtime, links)
+        self._cache = (stamp, links)
         return links
+
+    def _index(self) -> tuple[dict, dict]:
+        links = self.links()
+        if self._index_cache and self._index_cache[0] is links:
+            return self._index_cache[1]
+        by_from: dict[str, list] = {}
+        by_to: dict[str, list] = {}
+        for lk in links:
+            by_from.setdefault(lk["from"], []).append(lk)
+            by_to.setdefault(lk["to"], []).append(lk)
+        self._index_cache = (links, (by_from, by_to))
+        return by_from, by_to
 
     def evidence(self, memory_id: str) -> list[dict]:
         """Links from *memory_id* to what it rests on."""
-        return [lk for lk in self.links() if lk["from"] == memory_id]
+        return list(self._index()[0].get(memory_id, ()))
 
     def dependents(self, memory_id: str) -> list[dict]:
         """Links from memories that rest on *memory_id*."""
-        return [lk for lk in self.links() if lk["to"] == memory_id]
+        return list(self._index()[1].get(memory_id, ()))
 
     def _write(self, links: list[dict]) -> None:
         _write_atomic(self.path, {"format": "engram-relations", "version": FORMAT_VERSION, "links": links})
@@ -261,8 +276,8 @@ def claim_type(drawer, evidence_links: list[dict]) -> str:
     return "supported" if evidence_links else "direct"
 
 
-def _brief(chateau, lineage: Lineage, memory_id: str, chars: int = 300) -> dict:
-    drawer = chateau.find_drawer(memory_id)
+def _brief(chateau, lineage: Lineage, memory_id: str, chars: int = 300, find=None) -> dict:
+    drawer = (find or chateau.find_drawer)(memory_id)
     if drawer is None:
         return {"id": memory_id, "missing": True}
     info = lineage.status(memory_id)
@@ -383,12 +398,23 @@ def check(chateau) -> dict:
     * ``broken_links``: links to memories that no longer exist.
     """
     lineage, rel = Lineage(chateau.path), Relations(chateau.path)
-    exists: dict[str, bool] = {}
+    # One directory listing instead of a search of the whole château per memory.
+    files = {p.stem: p for p in chateau.path.glob("*/*/*/*.json")}
+    loaded: dict[str, object] = {}
+
+    def find(mid: str):
+        if mid not in loaded:
+            try:
+                loaded[mid] = Drawer.from_dict(json.loads(files[mid].read_text())) if mid in files else None
+            except (OSError, ValueError, TypeError, KeyError):
+                loaded[mid] = None
+        return loaded[mid]
 
     def present(mid: str) -> bool:
-        if mid not in exists:
-            exists[mid] = chateau.find_drawer(mid) is not None
-        return exists[mid]
+        return find(mid) is not None
+
+    def brief(mid: str) -> dict:
+        return _brief(chateau, lineage, mid, find=find)
 
     report: dict[str, list] = {"stale_support": [], "unsupported_inferences": [],
                                "unresolved_conflicts": [], "broken_links": []}
@@ -402,8 +428,8 @@ def check(chateau) -> dict:
         ev = lineage.status(lk["to"])
         if ev["status"] in ("superseded", "disputed"):
             report["stale_support"].append({
-                "memory": _brief(chateau, lineage, lk["from"]), "relation": lk["kind"],
-                "evidence": _brief(chateau, lineage, lk["to"]), "problem": ev["status"]})
+                "memory": brief(lk["from"]), "relation": lk["kind"],
+                "evidence": brief(lk["to"]), "problem": ev["status"]})
     # A conclusion resting on a conclusion whose own evidence went stale is stale too.
     flagged = {item["memory"]["id"] for item in report["stale_support"]}
     reasons = {mid: [mid] for mid in flagged}
@@ -417,8 +443,8 @@ def check(chateau) -> dict:
             reasons[up] = [up] + reasons[mid]
             queue.append(up)
             report["stale_support"].append({
-                "memory": _brief(chateau, lineage, up), "relation": lk["kind"],
-                "evidence": _brief(chateau, lineage, mid), "problem": "upstream",
+                "memory": brief(up), "relation": lk["kind"],
+                "evidence": brief(mid), "problem": "upstream",
                 "through": reasons[mid]})
     for lk in lineage.links():
         if any(not present(m) for m in (lk["old"], lk["new"])):
@@ -426,13 +452,13 @@ def check(chateau) -> dict:
         elif lk["kind"] == "disputes" and all(lineage.status(m)["status"] != "superseded"
                                               for m in (lk["old"], lk["new"])):
             report["unresolved_conflicts"].append({
-                "a": _brief(chateau, lineage, lk["old"]), "b": _brief(chateau, lineage, lk["new"]),
+                "a": brief(lk["old"]), "b": brief(lk["new"]),
                 "reason": lk.get("reason") or None, "since": lk["at"]})
     with_evidence = {lk["from"] for lk in rel.links()}
     for drawer in chateau.iter_drawers():
         if drawer.source == "inference" and drawer.id not in with_evidence \
                 and lineage.status(drawer.id)["status"] != "superseded":
-            report["unsupported_inferences"].append(_brief(chateau, lineage, drawer.id))
+            report["unsupported_inferences"].append(brief(drawer.id))
     report["ok"] = not any(report[k] for k in ("stale_support", "unsupported_inferences",
                                                "unresolved_conflicts", "broken_links"))
     return report
