@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
+from urllib.parse import urlsplit
+
+from engram.embedding import is_local_host
 
 
 @dataclass
@@ -17,6 +21,41 @@ class AnswerConfig:
     max_context_chunks: int = 5
     temperature: float = 0.1
     use_local_llm: bool = True
+    # An OpenAI-compatible chat server you run (uzu, LM Studio, llama.cpp,
+    # vLLM, Ollama's /v1): set the base URL, e.g. "http://localhost:8000/v1".
+    # When set it is used instead of Ollama.
+    openai_api_url: str = ""
+    openai_api_key: str = ""
+
+
+class LLMConfigError(RuntimeError):
+    """The chat server setting can't be used (and why)."""
+
+
+def llm_settings(cfg: dict) -> dict:
+    """AnswerConfig fields for the chat server in *cfg* / the environment.
+
+    Returns ``{}`` when none is set (Ollama is used). Like the embedding
+    server, the chat server receives memory text, so it must be on this
+    computer or your network unless ``llm_api_allow_remote`` is true.
+    """
+    url = (os.environ.get("ENGRAM_LLM_API_URL") or cfg.get("llm_api_url") or "").strip()
+    if not url:
+        return {}
+    parts = urlsplit(url)
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        raise LLMConfigError(f"llm_api_url {url!r} is not an http(s) address")
+    if not is_local_host(parts.hostname) and not cfg.get("llm_api_allow_remote"):
+        raise LLMConfigError(
+            f"llm_api_url points at {parts.hostname}, which is not on this computer or your local "
+            "network, so your memories' text would be sent there. If that is what you want, set "
+            '"llm_api_allow_remote": true in ~/.engram/config.json.')
+    out = {"openai_api_url": url.rstrip("/"),
+           "openai_api_key": os.environ.get("ENGRAM_LLM_API_KEY") or cfg.get("llm_api_key") or ""}
+    model = (os.environ.get("ENGRAM_LLM_API_MODEL") or cfg.get("llm_api_model") or "").strip()
+    if model:
+        out["llm_model"] = model
+    return out
 
 
 class AnswerGenerator:
@@ -63,7 +102,9 @@ class AnswerGenerator:
 
         prompt = self._build_prompt(question, context, identity)
 
-        if self.config.use_local_llm and self._check_ollama():
+        if self.config.openai_api_url:
+            answer = self._query_openai(prompt)
+        elif self.config.use_local_llm and self._check_ollama():
             answer = self._query_ollama(prompt)
         else:
             answer = f"Based on memory:\n{results[0]['text']}"
@@ -121,5 +162,29 @@ class AnswerGenerator:
             response = requests.post(self.config.llm_api_url, json=payload, timeout=60)
             response.raise_for_status()
             return response.json().get("response", "Error generating answer")
+        except Exception as exc:
+            return f"Error querying LLM: {exc}"
+
+    def _query_openai(self, prompt: str) -> str:
+        try:
+            import requests  # type: ignore
+        except ImportError:
+            return "requests library not installed. Run: pip install requests"
+
+        headers = {"Content-Type": "application/json"}
+        if self.config.openai_api_key:
+            headers["Authorization"] = f"Bearer {self.config.openai_api_key}"
+        payload = {
+            "model": self.config.llm_model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": self.config.temperature,
+            "stream": False,
+        }
+
+        try:
+            response = requests.post(f"{self.config.openai_api_url}/chat/completions",
+                                     json=payload, headers=headers, timeout=60)
+            response.raise_for_status()
+            return response.json()["choices"][0]["message"]["content"].strip()
         except Exception as exc:
             return f"Error querying LLM: {exc}"

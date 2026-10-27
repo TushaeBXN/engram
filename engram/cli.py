@@ -373,18 +373,29 @@ def cmd_kg_timeline(
 def cmd_answer(
     question: str = typer.Argument(..., help="Question to answer from memory."),
     wing: Optional[str] = typer.Option(None, "--wing", "-w", help="Scope search to a wing."),
-    model: str = typer.Option("llama3.2", "--model", "-m", help="Ollama model to use."),
+    model: Optional[str] = typer.Option(None, "--model", "-m", help="Model to use (default: llm_api_model, else llama3.2)."),
     chunks: int = typer.Option(5, "--chunks", "-k", help="Number of memory chunks to retrieve."),
 ):
-    """Answer a question grounded in Engram memory (uses Ollama if available)."""
-    from engram.qa import AnswerConfig, AnswerGenerator
+    """Answer a question grounded in Engram memory.
+
+    Uses the OpenAI-compatible server in llm_api_url (uzu, LM Studio, llama.cpp...)
+    if set, otherwise Ollama if available.
+    """
+    from engram.qa import AnswerConfig, AnswerGenerator, LLMConfigError, llm_settings
 
     cfg = load_config()
     palace = _palace()
     backend = _backend(cfg)
     searcher = _searcher(palace=palace, backend=backend, cfg=cfg)
 
-    config = AnswerConfig(llm_model=model, max_context_chunks=chunks)
+    try:
+        fields = llm_settings(cfg)
+    except LLMConfigError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1)
+    if model:
+        fields["llm_model"] = model
+    config = AnswerConfig(max_context_chunks=chunks, **fields)
     generator = AnswerGenerator(searcher, config)
 
     with console.status("Searching memory and generating answer..."):

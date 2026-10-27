@@ -477,6 +477,7 @@ Everything works out of the box. If you want to tweak things, settings live in `
 | `projects` | `{}` | Map folders to wings when the folder name isn't what you want, e.g. `{"~/code/app": "billing"}` |
 | `keyword_search` | `true` | Exact-word index searched alongside meaning (SQLite, no download), built from your existing memories the first time it runs |
 | `embedding_api_url` / `embedding_api_model` | unset | Use an embedding server you run (LM Studio, Ollama, llama.cpp, vLLM: anything with `/v1/embeddings`) instead of the built-in English model, e.g. for other languages. Run `engram reindex` once after setting it. The server must be on this computer or your network unless `embedding_api_allow_remote` is `true`, because your memories' text is sent to it |
+| `llm_api_url` / `llm_api_model` | unset | Answer `engram answer` with a chat server you run (uzu's OpenAI-compatible server, LM Studio, llama.cpp, vLLM: anything with `/v1/chat/completions`) instead of Ollama, e.g. `"http://localhost:8000/v1"`. Same rule as the embedding server: it must be on this computer or your network unless `llm_api_allow_remote` is `true`. Key from `ENGRAM_LLM_API_KEY` or `llm_api_key` |
 | `vector_backend` | `chromadb` | Search engine: `chromadb`, `faiss` or `sqlitevec` (no compiled parts) |
 | `hybrid_weight` | `0.3` | Boost for results sharing your exact words; `0` turns it off |
 | `temporal_weight` | `0.4` | Boost for memories near a time the question names; `0` turns it off |
