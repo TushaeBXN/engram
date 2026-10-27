@@ -54,8 +54,11 @@ def test_forgetting_evidence_leaves_dependents_and_check_lists_the_orphans(serve
     what = plan(server.palace, evidence)
     assert [m["id"] for m in what["memories_that_lose_it_as_evidence"]] == [view]
     forget(server.palace, server.backend, evidence)
-    assert server.palace.find_drawer(view) is not None and Relations(server.palace.path).links() == []
-    assert [m["id"] for m in check(server.palace)["unsupported_inferences"]] == [view]
+    assert server.palace.find_drawer(view) is not None
+    (marker,) = Relations(server.palace.path).links()
+    assert marker["forgotten"] and marker["to"] == evidence and marker["reason"] == ""
+    report = check(server.palace)
+    assert [lk["to"] for lk in report["broken_links"] if lk["forgotten"]] == [evidence] and not report["ok"]
 
 
 def test_conflict_marks_and_provenance_go_too(server):
@@ -93,3 +96,36 @@ def test_the_mcp_delete_tool_cleans_links_too(server):
     assert out == {"deleted": True} and Lineage(server.palace.path).links() == []
     assert server.dispatch("engram_delete_drawer", {"wing": "brian", "room": "pref", "hall": "facts", "drawer_id": "nope"}) == {"deleted": False}
     json.dumps(out)
+
+
+def test_a_supported_claim_does_not_silently_become_unsupported(server):
+    from engram.relations import explain
+    law = add(server, "Statute 12 caps the fee at 5%.", source="primary")
+    decision = add(server, "We charge 5%.", based_on=[law])
+    forget(server.palace, server.backend, law)
+    why = explain(server.palace, decision)
+    assert why["claim"] == "supported" and why["evidence"][0]["forgotten"]
+    assert any("was deleted" in c for c in why["concerns"])
+    assert "Statute" not in json.dumps(why["evidence"]) and not check(server.palace)["ok"]
+
+
+def test_a_forgotten_marker_survives_export_import_and_can_be_dismissed(server, tmp_path):
+    from engram.backup import export_backup, import_backup
+    from engram.chateau import Chateau
+    from engram.relations import link_memories
+    law = add(server, "Statute 12 caps the fee at 5%.", source="primary")
+    decision = add(server, "We charge 5%.", based_on=[law])
+    forget(server.palace, server.backend, law)
+    export_backup(tmp_path / "b.json", server.palace)
+    fresh = Chateau(chateau_path=tmp_path / "fresh")
+    assert import_backup(tmp_path / "b.json", fresh)["evidence_links_added"] == 1
+    assert [lk["to"] for lk in check(fresh)["broken_links"]] == [law]
+    out = link_memories(fresh, decision, "based_on", law[:8], undo=True)
+    assert out["removed"] and check(fresh)["ok"]
+
+
+def test_forgetting_the_conclusion_drops_its_own_links(server):
+    law = add(server, "Statute 12 caps the fee at 5%.", source="primary")
+    decision = add(server, "We charge 5%.", based_on=[law])
+    forget(server.palace, server.backend, decision)
+    assert Relations(server.palace.path).links() == [] and check(server.palace)["ok"]

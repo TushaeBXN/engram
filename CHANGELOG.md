@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.10.6
+
+**Deleting evidence no longer hides that a conclusion lost it.** Before, `engram
+forget` removed the link from a conclusion to its deleted evidence, so the
+conclusion quietly turned into an unsupported claim and `engram check` said
+everything was fine (unless it was marked as an inference). Now the link stays
+as a marker (the ID and when, never any text of the deleted memory),
+`engram check` lists it as "Evidence deleted", and `engram why` adds a concern.
+Dismiss it with `engram link <id> based_on <forgotten id> --undo`. Markers
+survive export and import.
+
+**`engram check` follows corrected evidence up the chain.** If A rests on B and B
+rests on C, correcting C already flagged B; now A is flagged too
+(`problem: "upstream"`, with `through` naming the memories in between).
+
 ## 1.10.5
 
 **`engram forget` deletes a memory for good.** It first shows what would change

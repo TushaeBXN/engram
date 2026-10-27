@@ -9,9 +9,11 @@ keeps the old memory as history, forgetting deletes it:
   correction, the memory it replaced becomes current again; if it was the
   older half, the memory that replaced it simply stops saying it replaced
   something;
-* every conflict mark and every evidence link in either direction. Memories
-  that rested on it are not deleted: they just lose that evidence, and
-  ``engram check`` will list them if they are now inferences with nothing behind them;
+* every conflict mark, and the evidence links *from* it. Memories that rested
+  on it are not deleted, and they do not quietly become unsupported claims: the
+  link stays as a marker (the ID and when it was forgotten, never any text), and
+  ``engram check`` and ``engram why`` say their evidence was deleted until
+  you dismiss it with ``engram link <id> based_on <forgotten id> --undo``;
 * its provenance record.
 
 It does not touch backups you exported earlier, and a forgotten memory is not

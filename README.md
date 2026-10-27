@@ -425,7 +425,7 @@ engram correct <id> "text" --source primary --ref "cite" --based-on <evidence-id
 ### Deleting
 ```bash
 engram forget <id>                                     # show what deleting it would change
-engram forget <id> --yes                               # delete it, its search entries and every link to it
+engram forget <id> --yes                               # delete it and its search entries; memories that rested on it get an "evidence deleted" flag in check
 ```
 Forgetting is for things that should never have been saved. A memory it replaced becomes current again, memories that rested on it lose that evidence (`engram check` lists any left with nothing behind them), and earlier exports still contain it. To change a memory without losing its history, use `engram correct` instead.
 

@@ -595,7 +595,7 @@ def cmd_forget(
     notes = [("becomes current again", "becomes_current_again"),
              ("stops saying it replaced something", "loses_its_replaced_label"),
              ("loses its conflict mark", "conflict_marks_removed"),
-             ("loses it as evidence", "memories_that_lose_it_as_evidence")]
+             ("loses it as evidence (and `engram check` will flag it)", "memories_that_lose_it_as_evidence")]
     for label, key in notes:
         for other in what[key]:
             console.print(f"  [yellow]{label}:[/yellow] {short_id(other['id'])}  {escape(other['text'][:90])}", highlight=False)
@@ -746,7 +746,7 @@ def cmd_check(as_json: bool = typer.Option(False, "--json", help="Print the repo
     for item in report["stale_support"]:
         m, ev = item["memory"], item["evidence"]
         what = (f"was corrected (now {short_id(ev['current_id'])})" if item["problem"] == "superseded"
-                else "is disputed")
+                else "itself rests on changed evidence" if item["problem"] == "upstream" else "is disputed")
         console.print(f"[yellow]Evidence changed[/yellow]  {short_id(m['id'])} rests on {short_id(ev['id'])}, "
                       f"which {what}.", highlight=False)
         console.print(f"  [dim]{escape(m['text'][:120])}[/dim]", highlight=False)
@@ -758,6 +758,12 @@ def cmd_check(as_json: bool = typer.Option(False, "--json", help="Print the repo
         console.print(f"[yellow]Undecided[/yellow]  {short_id(c['a']['id'])} and {short_id(c['b']['id'])} "
                       f"conflict (since {c['since'][:10]}).", highlight=False)
     for lk in report["broken_links"]:
+        if lk.get("forgotten"):
+            console.print(f"[yellow]Evidence deleted[/yellow]  {short_id(lk['from'])} rested on "
+                          f"{short_id(lk['to'])}, which was forgotten "
+                          f"(dismiss with `engram link {short_id(lk['from'])} {lk['kind']} "
+                          f"{short_id(lk['to'])} --undo`).", highlight=False)
+            continue
         console.print(f"[red]Broken link[/red]  {lk['kind']} refers to missing memory "
                       f"{', '.join(short_id(x) for x in lk['missing'])}.", highlight=False)
     console.print("\n[dim]Use `engram why <id>` for details. Nothing was changed.[/dim]")

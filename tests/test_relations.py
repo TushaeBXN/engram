@@ -222,3 +222,16 @@ def test_cli_link_source_why_check(engram_home):
     res = runner.invoke(app, ["check"])
     assert "No evidence" in res.output
     assert runner.invoke(app, ["link", view.id[:8], "proves", ev.id[:8]]).exit_code == 1
+
+
+def test_check_follows_stale_evidence_up_the_chain(server):
+    from engram.lineage import correct_memory
+    fact = call(server, "engram_add_memory", content="Limit is 10.", wing="w", room="r", source="primary")["id"]
+    finding = call(server, "engram_add_memory", content="So the cap is 10.", wing="w", room="r",
+                   source="inference", based_on=[fact])["id"]
+    plan_ = call(server, "engram_add_memory", content="Plan for 10.", wing="w", room="r",
+                 based_on=[finding])["id"]
+    correct_memory(server.palace, server.backend, fact, "Limit is 20.")
+    stale = {i["memory"]["id"]: i for i in check(server.palace)["stale_support"]}
+    assert stale[finding]["problem"] == "superseded"
+    assert stale[plan_]["problem"] == "upstream" and stale[plan_]["through"] == [finding]

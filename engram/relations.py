@@ -24,8 +24,14 @@ Memories saved before this existed have no source and are treated as
 "not recorded", never guessed.
 
 Like lineage, Engram never creates these links itself. The agent decides;
-Engram keeps them sound (no missing memories, no circular evidence), never
-rewrites them when evidence is corrected, and points out what needs review.
+Engram keeps them sound (no circular evidence), never rewrites them when
+evidence is corrected, and points out what needs review.
+
+When evidence is deleted with ``engram forget``, the link from a surviving
+memory is kept as a marker (``forgotten``: the ID and when, never the text), so
+the memory does not silently turn into an unsupported claim; ``engram check``
+and ``engram why`` say its evidence was deleted until the marker is dismissed
+with ``engram link <id> based_on <forgotten id> --undo``.
 
 Links live in ``<chateau>/relations.json``, separate from ``lineage.json`` so
 older Engram versions keep reading the lineage ledger unchanged.
@@ -72,6 +78,8 @@ def validate_relations(links: list[dict], known_ids: Optional[set] = None) -> No
             raise LineageError(f"memory {frm} cannot rest on itself")
         if known_ids is not None:
             for mid in (frm, to):
+                if link.get("forgotten") and mid == to:
+                    continue  # the evidence was deleted on purpose; the marker stays
                 if mid not in known_ids:
                     raise LineageError(f"relation refers to unknown memory {mid}")
         edges.setdefault(frm, set()).add(to)
@@ -141,13 +149,26 @@ class Relations:
             return True
 
     def forget(self, memory_id: str) -> int:
-        """Drop every evidence link that mentions *memory_id* (the memory was deleted). Returns how many."""
+        """Handle the deletion of *memory_id*. Returns how many links changed.
+
+        Links *from* it go (it no longer rests on anything). Links *to* it stay
+        as markers on the memories that rested on it: ``forgotten`` plus the
+        time, with the reason cleared so nothing of the deleted memory is kept.
+        """
         with _locked_dir(self.dir, RELATIONS_FILE):
             links = self.links()
-            kept = [lk for lk in links if memory_id not in (lk["from"], lk["to"])]
-            if len(kept) != len(links):
+            kept, changed = [], 0
+            for lk in links:
+                if lk["from"] == memory_id:
+                    changed += 1
+                elif lk["to"] == memory_id:
+                    kept.append({**lk, "forgotten": True, "forgotten_at": _now(), "reason": ""})
+                    changed += 1
+                else:
+                    kept.append(lk)
+            if changed:
                 self._write(kept)
-            return len(links) - len(kept)
+            return changed
 
     def replace_all(self, links: list[dict]) -> None:
         """Write *links* as the whole ledger (used by import, after validation)."""
@@ -165,7 +186,16 @@ def link_memories(chateau, memory_id: str, kind: str, target_id: str, reason: st
     """Record "*memory_id* <kind> *target_id*" (IDs or unique prefixes), or remove it with *undo*."""
     if kind not in LINK_KINDS:
         raise LineageError(f"unknown relationship {kind!r}; use one of: {', '.join(LINK_KINDS)}")
-    a, b = _resolve(chateau, memory_id), _resolve(chateau, target_id)
+    a = _resolve(chateau, memory_id)
+    if undo and kind in EVIDENCE_KINDS and len(target_id) >= 8:  # dismiss a marker for deleted evidence
+        rel = Relations(chateau.path)
+        gone = [lk for lk in rel.evidence(a.id) if lk["kind"] == kind and lk.get("forgotten")
+                and lk["to"].startswith(target_id) and chateau.find_drawer(lk["to"]) is None]
+        if len(gone) == 1:
+            return {"memory": _summary(a), "relation": kind,
+                    "target": {"id": gone[0]["to"], "text": "(forgotten)"},
+                    "removed": rel.remove(kind, a.id, gone[0]["to"])}
+    b = _resolve(chateau, target_id)
     if a.id == b.id:
         raise LineageError("a memory cannot be linked to itself")
     out = {"memory": _summary(a), "relation": kind, "target": _summary(b)}
@@ -255,6 +285,8 @@ def _evidence_tree(chateau, lineage, rel, memory_id, depth, seen) -> list[dict]:
         seen.add(lk["to"])
         item = {"relation": lk["kind"], "reason": lk.get("reason") or None, "linked_at": lk["at"],
                 **_brief(chateau, lineage, lk["to"])}
+        if item.get("missing") and lk.get("forgotten"):
+            item["forgotten"], item["forgotten_at"] = True, lk.get("forgotten_at")
         if depth > 1 and not item.get("missing"):
             deeper = _evidence_tree(chateau, lineage, rel, lk["to"], depth - 1, seen)
             if deeper:
@@ -267,7 +299,9 @@ def _concerns(memory: dict, evidence: list[dict], claim: str, prefix: str = "") 
     notes = []
     for ev in evidence:
         sid = ev["id"][:8]
-        if ev.get("missing"):
+        if ev.get("forgotten"):
+            notes.append(f"{prefix}evidence {sid} was deleted; check whether this still holds without it")
+        elif ev.get("missing"):
             notes.append(f"{prefix}evidence {sid} no longer exists")
         elif ev["status"] == "superseded":
             notes.append(f"{prefix}evidence {sid} was corrected (current version: {ev['current_id'][:8]}); "
@@ -361,7 +395,7 @@ def check(chateau) -> dict:
     for lk in rel.links():
         missing = [m for m in (lk["from"], lk["to"]) if not present(m)]
         if missing:
-            report["broken_links"].append({**lk, "missing": missing})
+            report["broken_links"].append({**lk, "missing": missing, "forgotten": bool(lk.get("forgotten"))})
             continue
         if lineage.status(lk["from"])["status"] == "superseded":
             continue  # history: the old position keeps the evidence it had
@@ -370,6 +404,22 @@ def check(chateau) -> dict:
             report["stale_support"].append({
                 "memory": _brief(chateau, lineage, lk["from"]), "relation": lk["kind"],
                 "evidence": _brief(chateau, lineage, lk["to"]), "problem": ev["status"]})
+    # A conclusion resting on a conclusion whose own evidence went stale is stale too.
+    flagged = {item["memory"]["id"] for item in report["stale_support"]}
+    reasons = {mid: [mid] for mid in flagged}
+    queue = list(flagged)
+    while queue:
+        mid = queue.pop(0)
+        for lk in rel.dependents(mid):
+            up = lk["from"]
+            if up in reasons or not present(up) or lineage.status(up)["status"] == "superseded":
+                continue
+            reasons[up] = [up] + reasons[mid]
+            queue.append(up)
+            report["stale_support"].append({
+                "memory": _brief(chateau, lineage, up), "relation": lk["kind"],
+                "evidence": _brief(chateau, lineage, mid), "problem": "upstream",
+                "through": reasons[mid]})
     for lk in lineage.links():
         if any(not present(m) for m in (lk["old"], lk["new"])):
             report["broken_links"].append({**lk, "missing": [m for m in (lk["old"], lk["new"]) if not present(m)]})
