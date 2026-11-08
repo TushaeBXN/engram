@@ -6,6 +6,7 @@ Data is persisted under ~/.engram/chroma_db/.
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +39,7 @@ class ChromaDBBackend(VectorBackend):
         self._persist_dir = str(Path(persist_directory).expanduser())
         Path(self._persist_dir).mkdir(parents=True, exist_ok=True)
 
+        self._lock = threading.Lock()  # guards all _col / _client calls (Rust FFI is not thread-safe)
         self._client = chromadb.PersistentClient(path=self._persist_dir)
         self._col = self._client.get_or_create_collection(
             name=collection_name,
@@ -54,32 +56,36 @@ class ChromaDBBackend(VectorBackend):
     # ------------------------------------------------------------------
 
     def add(self, id: str, text: str, metadata: dict) -> None:
-        self._col.upsert(ids=[id], documents=[text], metadatas=[_sanitise(metadata)])
+        with self._lock:
+            self._col.upsert(ids=[id], documents=[text], metadatas=[_sanitise(metadata)])
 
     def add_many(self, items: list[tuple[str, str, dict]]) -> None:
         for start in range(0, len(items), _BATCH):
             batch = items[start:start + _BATCH]
-            self._col.upsert(
-                ids=[i for i, _, _ in batch],
-                documents=[t for _, t, _ in batch],
-                metadatas=[_sanitise(m) for _, _, m in batch],
-            )
+            with self._lock:
+                self._col.upsert(
+                    ids=[i for i, _, _ in batch],
+                    documents=[t for _, t, _ in batch],
+                    metadatas=[_sanitise(m) for _, _, m in batch],
+                )
 
     def search(self, query: str, n: int = 10, where: dict | None = None) -> list[dict]:
-        kwargs: dict[str, Any] = {
-            "query_texts": [query],
-            "n_results": min(n, max(1, self.count())),
-            "include": ["documents", "metadatas", "distances"],
-        }
-        if where:
-            kwargs["where"] = _chroma_where(where)
-        try:
-            res = self._col.query(**kwargs)
-        except Exception as exc:
-            from engram.embedding import EmbeddingConfigError
-            if isinstance(exc, EmbeddingConfigError):
-                raise  # an embedding server that is down must not look like "no results"
-            return []
+        with self._lock:
+            count = self._col.count()
+            kwargs: dict[str, Any] = {
+                "query_texts": [query],
+                "n_results": min(n, max(1, count)),
+                "include": ["documents", "metadatas", "distances"],
+            }
+            if where:
+                kwargs["where"] = _chroma_where(where)
+            try:
+                res = self._col.query(**kwargs)
+            except Exception as exc:
+                from engram.embedding import EmbeddingConfigError
+                if isinstance(exc, EmbeddingConfigError):
+                    raise  # an embedding server that is down must not look like "no results"
+                return []
 
         results = []
         ids = res.get("ids", [[]])[0]
@@ -99,13 +105,15 @@ class ChromaDBBackend(VectorBackend):
 
     def delete_where(self, where: dict) -> None:
         try:
-            self._col.delete(where=_chroma_where(where))
+            with self._lock:
+                self._col.delete(where=_chroma_where(where))
         except Exception:
             pass
 
     def delete(self, id: str) -> None:
         try:
-            self._col.delete(ids=[id])
+            with self._lock:
+                self._col.delete(ids=[id])
         except Exception:
             pass
 
@@ -117,16 +125,19 @@ class ChromaDBBackend(VectorBackend):
         one collection they crowd out real neighbours (recall fell from 1.00
         to 0.70 after ten rounds in testing).
         """
-        self._client.delete_collection(self._collection_name)
+        with self._lock:
+            self._client.delete_collection(self._collection_name)
 
     def count(self) -> int:
         try:
-            return self._col.count()
+            with self._lock:
+                return self._col.count()
         except Exception:
             return 0
 
     def update(self, id: str, text: str, metadata: dict) -> None:
-        self._col.update(ids=[id], documents=[text], metadatas=[_sanitise(metadata)])
+        with self._lock:
+            self._col.update(ids=[id], documents=[text], metadatas=[_sanitise(metadata)])
 
 
 # ---------------------------------------------------------------------------
