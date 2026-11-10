@@ -15,7 +15,8 @@ concurrency:
 jobs:
   test:
     name: Tests (Python ${{ matrix.python-version }})
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest (26.04) no longer offers Python 3.9, which pyproject.toml still supports.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
       fail-fast: false
