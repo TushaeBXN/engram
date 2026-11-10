@@ -529,7 +529,7 @@ compress("The authentication module is a critical component that has a dependenc
 
 `engram ui` opens a live map of the memories in `~/.engram/` at http://127.0.0.1:7741. Each wing is a cluster and each room a point: bigger rooms hold more, brighter ones were touched recently. A search lights up the rooms it found and joins them in the order they ranked. Opening a memory shows where it came from, the evidence it rests on, its earlier versions and why search ranked it; you can save, pin and correct memories from the page, and the health button lists conclusions resting on outdated evidence and open conflicts. A strip along the bottom shows how much was saved each day. The page is one file with no libraries, loads nothing from the internet, and is served to this computer only.
 
-<img width="1126" height="932" alt="Engram notes UI with knowledge graph" src="https://github.com/user-attachments/assets/870d76e7-bdc3-42a5-9056-6a54a1dd7ef1" />
+<img width="1366" height="682" alt="The Engram interface: wings as clusters of rooms on a map, a search for &quot;Anthos&quot; lighting up four rooms joined in rank order, and the ranked results in a side panel" src="https://raw.githubusercontent.com/TushaeBXN/engram/main/docs/images/engram-ui-map.webp" />
 
 ### Code map
 
