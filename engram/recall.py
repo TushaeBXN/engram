@@ -37,6 +37,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+from engram.fsio import atomic_write_text
+
 HEADER = ("[Engram memory: notes from earlier sessions that may be relevant. Use them if they "
           "help, ignore them if not. Outdated notes are history; prefer the current version.]")
 MIN_PROMPT_CHARS = 12
@@ -114,7 +116,7 @@ def _remember_seen(session_id: str, ids: set) -> None:
         return
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(sorted(ids)))
+        atomic_write_text(path, json.dumps(sorted(ids)))
         cutoff = time.time() - SESSION_TTL_DAYS * 86400
         for old in path.parent.glob("*.json"):  # tidy up old sessions
             if old.stat().st_mtime < cutoff:

@@ -55,9 +55,21 @@ WING_CONFIG_PATH = ENGRAM_DIR / "wing_config.json"
 IDENTITY_PATH = ENGRAM_DIR / "identity.txt"
 
 
+_warned: set[str] = set()
+
+
+def _warn_once(message: str) -> None:
+    if message not in _warned:
+        _warned.add(message)
+        import sys
+        print(message, file=sys.stderr)
+
+
 def ensure_engram_dir() -> None:
     """Create ~/.engram and its subdirectories if they don't exist."""
+    from engram.fsio import make_private
     ENGRAM_DIR.mkdir(parents=True, exist_ok=True)
+    make_private(ENGRAM_DIR)  # memories are private: no other account may look inside
     (ENGRAM_DIR / "chateau").mkdir(exist_ok=True)
     (ENGRAM_DIR / "agents").mkdir(exist_ok=True)
     (ENGRAM_DIR / "chroma_db").mkdir(exist_ok=True)
@@ -73,9 +85,13 @@ def load_config() -> dict[str, Any]:
     if CONFIG_PATH.exists():
         try:
             with CONFIG_PATH.open() as f:
-                cfg.update(json.load(f))
-        except (json.JSONDecodeError, OSError):
-            pass
+                loaded = json.load(f)
+            if not isinstance(loaded, dict):
+                raise ValueError("not a JSON object")
+            cfg.update(loaded)
+        except (ValueError, OSError) as exc:
+            _warn_once(f"engram: {CONFIG_PATH} could not be read ({exc}); using the default settings "
+                       "until it is fixed.")
     if os.environ.get("ENGRAM_VECTOR_BACKEND"):
         cfg["vector_backend"] = os.environ["ENGRAM_VECTOR_BACKEND"]
     return cfg
@@ -83,9 +99,9 @@ def load_config() -> dict[str, Any]:
 
 def save_config(cfg: dict[str, Any]) -> None:
     """Persist config to ~/.engram/config.json."""
+    from engram.fsio import atomic_write_text
     ensure_engram_dir()
-    with CONFIG_PATH.open("w") as f:
-        json.dump(cfg, f, indent=2)
+    atomic_write_text(CONFIG_PATH, json.dumps(cfg, indent=2))
 
 
 def load_wing_config() -> dict[str, Any]:
@@ -100,9 +116,9 @@ def load_wing_config() -> dict[str, Any]:
 
 
 def save_wing_config(wc: dict[str, Any]) -> None:
+    from engram.fsio import atomic_write_text
     ensure_engram_dir()
-    with WING_CONFIG_PATH.open("w") as f:
-        json.dump(wc, f, indent=2)
+    atomic_write_text(WING_CONFIG_PATH, json.dumps(wc, indent=2))
 
 
 def get_chateau_path() -> Path:

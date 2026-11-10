@@ -46,7 +46,6 @@ _EXT_HALL: dict[str, str] = {
     ".yaml": "facts",
     ".yml": "facts",
     ".toml": "facts",
-    ".env": "facts",
     ".sh": "advice",
     ".bash": "advice",
     ".zsh": "advice",
@@ -65,15 +64,48 @@ _SKIP_DIRS = {
 _SKIP_FILES = {".DS_Store", "Thumbs.db", ".gitignore"}
 _MAX_FILE_BYTES = 500_000  # skip files > 500 KB
 
+# Files that exist to hold credentials are never mined, whatever the
+# redaction setting: a memory is searched, recalled into prompts and exported,
+# and none of that should carry a private key or a password file with it.
+_SECRET_NAMES = {
+    ".netrc", ".npmrc", ".pypirc", ".pgpass", ".htpasswd", ".git-credentials", ".dockercfg",
+    "credentials", "credentials.json", "secrets.json", "secrets.yaml", "secrets.yml", "secrets.toml",
+    "id_rsa", "id_dsa", "id_ecdsa", "id_ed25519", "service-account.json", "terraform.tfstate",
+}
+_SECRET_SUFFIXES = {".pem", ".key", ".p12", ".pfx", ".jks", ".keystore", ".kdbx", ".ovpn", ".tfvars", ".asc", ".gpg"}
+_ENV_EXAMPLES = (".example", ".sample", ".template", ".dist")
+
+
+def is_secret_file(path: Path) -> bool:
+    """True for files whose purpose is to hold credentials (``.env``, private keys, ...)."""
+    name = path.name.lower()
+    if name in _SECRET_NAMES or path.suffix.lower() in _SECRET_SUFFIXES:
+        return True
+    if name == ".env" or name.startswith(".env.") or name.endswith(".env"):
+        return not name.endswith(_ENV_EXAMPLES)   # .env.example documents names, not values
+    return False
+
 
 def _is_text_file(path: Path) -> bool:
     mt, _ = mimetypes.guess_type(str(path))
     if mt and not mt.startswith("text"):
         return False
     try:
-        path.read_bytes()[:512].decode("utf-8")
+        with path.open("rb") as f:
+            head = f.read(512)
+    except OSError:
+        return False
+    try:
+        head.decode("utf-8")
         return True
-    except (UnicodeDecodeError, OSError):
+    except UnicodeDecodeError as exc:
+        return len(head) == 512 and exc.start >= 509  # only a character cut in half by the 512-byte window
+
+
+def _inside(path: Path, root: Path) -> bool:
+    try:
+        return path.resolve().is_relative_to(root.resolve())
+    except OSError:
         return False
 
 
@@ -133,6 +165,10 @@ class Miner:
                     continue
                 if fpath.name in _SKIP_FILES:
                     continue
+                # A link that leads out of the folder being mined (to ~/.ssh, say)
+                # is not part of the project.
+                if fpath.is_symlink() and not _inside(fpath, src):
+                    continue
                 d = self._mine_file(fpath, wing, room or fpath.parent.name, since_dt)
                 if d:
                     drawers.append(d)
@@ -147,6 +183,8 @@ class Miner:
         since: Optional[datetime],
     ) -> Optional[Drawer]:
         """Ingest a single file.  Returns None if skipped."""
+        if is_secret_file(path):
+            return None
         if path.stat().st_size > _MAX_FILE_BYTES:
             return None
         if since:

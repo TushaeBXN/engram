@@ -1,5 +1,58 @@
 # Changelog
 
+## Unreleased
+
+**`engram ui` now shows your real memory.** The page used to be a separate notes
+app that kept its notes in the browser and never looked at `~/.engram/`. It is
+now a live map of the château: wings are clusters, rooms are points (bigger
+holds more, brighter was touched recently), a search lights up the rooms it
+found, and opening a memory shows its source, the evidence it rests on, its
+earlier versions and why search ranked it. You can save, pin and correct from
+the page, and a health button lists what `engram check` finds. Notes written in
+the old page are offered a one-click move into memory. The page loads nothing
+from the internet (the old one fetched fonts and a script from two outside
+sites), is served with a strict Content-Security-Policy, and goes through the
+same local-only checks as `engram serve`. The old command also served every
+file in Engram's install folder; it now serves the page and nothing else.
+
+**Privacy and safety**
+
+- `engram mine` and the Claude Code save hook no longer ingest credential files
+  (`.env`, private keys, `.npmrc`, `.netrc`, `credentials.json`, Terraform state
+  and similar), whatever the redaction setting, and skip links that lead out of
+  the folder being mined. Previously `.env` files were mined as facts.
+- `~/.engram` is made readable by its owner only (0700), and files Engram
+  writes are created 0600. Before, other accounts on the same computer could
+  read your memories wherever home folders are world-readable.
+- The FAISS backend stores its metadata as JSON, not pickle. An old
+  `metadata.pkl` is read once with an unpickler that refuses all code, then
+  replaced.
+- The reranker model is downloaded at a fixed revision and each file is checked
+  against its SHA-256; a download that doesn't match is refused.
+- The MCP server no longer sends Python stack traces (which contain file paths)
+  to the client; they go to stderr.
+- Text that an agent app inserts into its transcripts (`<system-reminder>`
+  blocks, command echoes, compaction summaries) is no longer saved as memory
+  when mining Claude Code sessions. It was crowding real memories out of
+  recall and replaying an app's instructions to later sessions.
+
+**Reliability**
+
+- The ChromaDB index is now locked across processes as well as threads, so the
+  MCP server, the hooks and `engram mine` take turns instead of writing at
+  once (an interrupted, interleaved write is how an index gets corrupted). The
+  lock is released by the operating system if a process dies, and nothing waits
+  on it for more than 30 seconds.
+- An unreadable vector index is no longer silent. Search used to return
+  nothing; it now says once that the index needs `engram reindex` and answers
+  from the keyword index meanwhile.
+- `config.json`, backup imports, the recall state and the settings files that
+  `engram connect` and `engram install-hooks` edit are written atomically, so a
+  crash can't leave half a file. A `config.json` that can't be parsed is
+  reported instead of being ignored.
+- Files whose 512th byte falls inside a multi-byte character are no longer
+  mistaken for binary and skipped by `engram mine`.
+
 ## 1.10.5
 
 **`engram forget` deletes a memory for good.** It first shows what would change

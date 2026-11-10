@@ -778,8 +778,10 @@ def run_server() -> None:
             response = _handle_message(server, msg)
             if response is not None:
                 _send(response)
-        except Exception:
-            _send(_error(msg.get("id"), -32603, traceback.format_exc()))
+        except Exception as exc:  # the trace stays local: it holds file paths
+            traceback.print_exc(file=sys.stderr)
+            _send(_error(msg.get("id") if isinstance(msg, dict) else None, -32603,
+                         f"internal error ({type(exc).__name__})"))
 
 
 if __name__ == "__main__":

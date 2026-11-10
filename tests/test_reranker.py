@@ -121,13 +121,42 @@ def test_ensure_model_downloads_once(tmp_path, monkeypatch):
         def iter_content(self, chunk_size):
             yield b"data"
 
+    import hashlib
+
     import requests
     monkeypatch.setattr(requests, "get", lambda url, **kw: FakeResponse(url))
+    pin = rr.PINNED[rr.DEFAULT_MODEL]
+    good = {name: hashlib.sha256(b"data").hexdigest() for name, _ in rr.MODEL_FILES}
+    monkeypatch.setitem(rr.PINNED, rr.DEFAULT_MODEL, {**pin, "sha256": good})
     target = rr.ensure_model(base=tmp_path)
     assert sorted(p.name for p in target.iterdir()) == ["model.onnx", "tokenizer.json"]
-    assert calls == [rr.DOWNLOAD_URL.format(model=rr.DEFAULT_MODEL, path=p) for _, p in rr.MODEL_FILES]
+    # fetched at the pinned revision, never from a moving branch
+    assert calls == [rr.DOWNLOAD_URL.format(model=rr.DEFAULT_MODEL, revision=pin["revision"], path=p)
+                     for _, p in rr.MODEL_FILES]
+    assert "/resolve/main/" not in calls[0]
     rr.ensure_model(base=tmp_path)  # already there: no second download
     assert len(calls) == 2
+
+
+def test_a_download_that_does_not_match_its_checksum_is_refused(tmp_path, monkeypatch):
+    class Tampered:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def raise_for_status(self):
+            pass
+
+        def iter_content(self, chunk_size):
+            yield b"not the model"
+
+    import requests
+    monkeypatch.setattr(requests, "get", lambda url, **kw: Tampered())
+    with pytest.raises(rr.RerankerUnavailable, match="checksum"):
+        rr.ensure_model(base=tmp_path)
+    assert not list(rr.model_path(base=tmp_path).glob("*"))  # nothing left behind to be loaded later
 
 
 def test_failed_download_leaves_no_partial_files(tmp_path, monkeypatch):
