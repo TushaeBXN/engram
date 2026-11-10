@@ -17,6 +17,7 @@ search carries on without reranking and says why once on stderr.
 
 from __future__ import annotations
 
+import hashlib
 import sys
 from pathlib import Path
 from typing import Optional
@@ -24,7 +25,19 @@ from typing import Optional
 DEFAULT_MODEL = "Xenova/ms-marco-MiniLM-L-6-v2"
 # Files fetched for a model, as (local name, path in the model repository).
 MODEL_FILES = (("model.onnx", "onnx/model.onnx"), ("tokenizer.json", "tokenizer.json"))
-DOWNLOAD_URL = "https://huggingface.co/{model}/resolve/main/{path}"
+DOWNLOAD_URL = "https://huggingface.co/{model}/resolve/{revision}/{path}"
+# The default model is fetched at one fixed revision and each file must match
+# its SHA-256, so a changed or tampered download is refused rather than run.
+# Other models (set with "reranker_model") are fetched from "main", unchecked.
+PINNED = {
+    DEFAULT_MODEL: {
+        "revision": "a09144355adeed5f58c8ed011d209bf8ee5a1fec",
+        "sha256": {
+            "model.onnx": "c623d0bcb99f4622beb413eaef00cfbe5db20df9f1dd982da4b4f26022881870",
+            "tokenizer.json": "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66",
+        },
+    },
+}
 MAX_LENGTH = 512
 
 
@@ -54,18 +67,24 @@ def ensure_model(model: str = DEFAULT_MODEL, base: Optional[Path] = None,
     target.mkdir(parents=True, exist_ok=True)
     print(f"engram: downloading reranker model {model} (about 90 MB, once) to {target}",
           file=sys.stderr)
+    pin = PINNED.get(model, {})
     for name, remote in MODEL_FILES:
         dest = target / name
         if dest.exists():
             continue
         tmp = dest.with_suffix(dest.suffix + ".part")
+        expected = pin.get("sha256", {}).get(name)
+        digest = hashlib.sha256()
         try:
-            with requests.get(DOWNLOAD_URL.format(model=model, path=remote),
+            with requests.get(DOWNLOAD_URL.format(model=model, revision=pin.get("revision", "main"), path=remote),
                               stream=True, timeout=60) as resp:
                 resp.raise_for_status()
                 with tmp.open("wb") as f:
                     for chunk in resp.iter_content(chunk_size=1 << 20):
                         f.write(chunk)
+                        digest.update(chunk)
+            if expected and digest.hexdigest() != expected:
+                raise ValueError("the downloaded file does not match its expected checksum")
             tmp.replace(dest)
         except Exception as exc:
             tmp.unlink(missing_ok=True)

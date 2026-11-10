@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import Optional
 
 from engram.chateau import RESERVED_DIRS, Chateau, Drawer, InvalidNameError, validate_name
+from engram.fsio import atomic_write_text
 from engram.lineage import LINEAGE_FILE, Lineage, LineageError, validate_links
 from engram.relations import Relations, validate_relations
 
@@ -317,12 +318,12 @@ def import_backup(src, chateau: Chateau, backend=None, kg_path: Optional[Path] =
         p = root / w["name"] / "wing.json"
         if not p.exists():
             p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_text(json.dumps(w, indent=2))
+            atomic_write_text(p, json.dumps(w, indent=2))
     for r in data.get("rooms") or []:
         p = root / r["wing"] / r["name"] / "room.json"
         if not p.exists():
             p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_text(json.dumps(r, indent=2))
+            atomic_write_text(p, json.dumps(r, indent=2))
 
     written = []
     for d in plan["drawers"]:
@@ -330,26 +331,26 @@ def import_backup(src, chateau: Chateau, backend=None, kg_path: Optional[Path] =
             old.unlink()
         dest = root / d["wing"] / d["room"] / d["hall"] / f"{d['id']}.json"
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(json.dumps(d, indent=2))
+        atomic_write_text(dest, json.dumps(d, indent=2))
         written.append(d)
 
     for c in data.get("closets") or []:
         p = root / c["wing"] / c["room"] / c["hall"] / "closet.es"
         if overwrite or not p.exists():
             p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_text(c["content"])
+            atomic_write_text(p, c["content"])
     for wing, tunnels in (data.get("tunnels") or {}).items():
         p = root / wing / "tunnels.json"
         current = _read_json(p) if p.exists() else []
         merged = current + [t for t in tunnels if t not in current]
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(json.dumps(merged, indent=2))
+        atomic_write_text(p, json.dumps(merged, indent=2))
     prov_dir = root / "provenance"
     for rec in data.get("provenance") or []:
         p = prov_dir / f"{rec['memory_id']}.json"
         if overwrite or not p.exists():
             prov_dir.mkdir(parents=True, exist_ok=True)
-            p.write_text(json.dumps(rec, indent=2))
+            atomic_write_text(p, json.dumps(rec, indent=2))
     if plan["links"]:
         Lineage(root).replace_all(plan["merged_links"])
     if plan["relations"]:
@@ -374,13 +375,13 @@ def import_backup(src, chateau: Chateau, backend=None, kg_path: Optional[Path] =
         conn.close()
     if identity_path and data.get("identity") and not Path(identity_path).exists():
         Path(identity_path).parent.mkdir(parents=True, exist_ok=True)
-        Path(identity_path).write_text(data["identity"])
+        atomic_write_text(Path(identity_path), data["identity"])
     if agents_dir:
         for name, text in (data.get("agents") or {}).items():
             p = Path(agents_dir) / name
             p.parent.mkdir(parents=True, exist_ok=True)
             if not p.exists():
-                p.write_text(text)
+                atomic_write_text(p, text)
             elif name.endswith(".jsonl"):  # diaries: add entries we don't have
                 have = set(p.read_text().splitlines())
                 extra = [ln for ln in text.splitlines() if ln and ln not in have]

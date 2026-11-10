@@ -8,10 +8,13 @@ when unavailable, so imports always succeed).  Install with::
 
 from __future__ import annotations
 
-import pickle
+import json
+import os
+import sys
 from pathlib import Path
 
 from engram.backends.base import VectorBackend
+from engram.fsio import atomic_write_text
 
 _EMBED_DIM = 384  # all-MiniLM-L6-v2 output dimension
 
@@ -45,7 +48,7 @@ class FaissBackend(VectorBackend):
         self._path = Path(index_path).expanduser()
         self._path.mkdir(parents=True, exist_ok=True)
         self._index_file = self._path / "index.faiss"
-        self._meta_file = self._path / "metadata.pkl"
+        self._meta_file = self._path / "metadata.json"
 
         self._embedder = _get_embedder()
         self._meta: dict[int, dict] = {}  # int_id → {"id": str, "text": str, "metadata": dict}
@@ -67,20 +70,39 @@ class FaissBackend(VectorBackend):
         return np.asarray(_hashed_bow(text), dtype="float32").reshape(1, -1)
 
     def _save(self) -> None:
-        self._faiss.write_index(self._index, str(self._index_file))
-        with self._meta_file.open("wb") as f:
-            pickle.dump({"meta": self._meta, "id_map": self._id_map, "next": self._next_int_id}, f)
+        # Index first, then the side-car, each replaced whole (never half-written).
+        tmp = self._index_file.with_name(self._index_file.name + ".tmp")
+        self._faiss.write_index(self._index, str(tmp))
+        os.replace(tmp, self._index_file)
+        atomic_write_text(self._meta_file, json.dumps(
+            {"meta": {str(k): v for k, v in self._meta.items()}, "id_map": self._id_map,
+             "next": self._next_int_id}, default=str))
 
     def _load(self) -> None:
-        if self._index_file.exists() and self._meta_file.exists():
+        legacy = self._path / "metadata.pkl"
+        if not self._index_file.exists() or not (self._meta_file.exists() or legacy.exists()):
+            return
+        try:
+            if self._meta_file.exists():
+                state = json.loads(self._meta_file.read_text(encoding="utf-8"))
+            else:
+                state = _load_legacy_pickle(legacy)
+            index = self._faiss.read_index(str(self._index_file))
+            self._meta = {int(k): v for k, v in state.get("meta", {}).items()}
+            self._id_map = {str(k): int(v) for k, v in state.get("id_map", {}).items()}
+            self._next_int_id = int(state.get("next", 0))
+            self._index = index
+        except Exception as exc:
+            self._meta, self._id_map, self._next_int_id = {}, {}, 0
+            print(f"engram: the FAISS index in {self._path} could not be read ({type(exc).__name__}); "
+                  "starting empty. Your memories are safe: run `engram reindex` to rebuild it.",
+                  file=sys.stderr)
+            return
+        if legacy.exists() and not self._meta_file.exists():  # move off pickle for good
             try:
-                self._index = self._faiss.read_index(str(self._index_file))
-                with self._meta_file.open("rb") as f:
-                    state = pickle.load(f)
-                self._meta = state.get("meta", {})
-                self._id_map = state.get("id_map", {})
-                self._next_int_id = state.get("next", 0)
-            except Exception:
+                self._save()
+                legacy.unlink()
+            except OSError:
                 pass
 
     # ------------------------------------------------------------------
@@ -135,6 +157,26 @@ class FaissBackend(VectorBackend):
     def update(self, id: str, text: str, metadata: dict) -> None:
         self.delete(id)
         self.add(id, text, metadata)
+
+
+def _load_legacy_pickle(path: Path) -> dict:
+    """Read a ``metadata.pkl`` written by Engram 1.10 or earlier.
+
+    A pickle can run code when it is loaded, so this unpickler refuses every
+    class and function: Engram's own file holds only dicts, lists, text and
+    numbers, which need none. Anything else is not Engram's file.
+    """
+    import pickle
+
+    class _DataOnly(pickle.Unpickler):
+        def find_class(self, module, name):
+            raise pickle.UnpicklingError(f"refusing to load {module}.{name} from {path.name}")
+
+    with path.open("rb") as f:
+        state = _DataOnly(f).load()
+    if not isinstance(state, dict):
+        raise ValueError("unexpected metadata format")
+    return state
 
 
 def _match_where(meta: dict, where: dict) -> bool:

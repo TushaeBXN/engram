@@ -21,6 +21,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+from engram.fsio import atomic_write_text
+
 SERVER_NAME = "engram"
 
 
@@ -117,7 +119,7 @@ def connect(app: App) -> str:
         path.parent.mkdir(parents=True, exist_ok=True)
         _backup(path)
         sep = "" if not text or text.endswith("\n\n") else ("\n" if text.endswith("\n") else "\n\n")
-        path.write_text(text + sep + _toml_block())
+        atomic_write_text(path.resolve(), text + sep + _toml_block())
         return "added"
     settings: dict = {}
     if path.exists() and path.read_text().strip():
@@ -137,7 +139,7 @@ def connect(app: App) -> str:
     servers[SERVER_NAME] = wanted
     path.parent.mkdir(parents=True, exist_ok=True)
     _backup(path)
-    path.write_text(json.dumps(settings, indent=2) + "\n")
+    atomic_write_text(path.resolve(), json.dumps(settings, indent=2) + "\n")
     return status
 
 

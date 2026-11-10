@@ -154,3 +154,67 @@ def test_cli_serve_creates_a_token_for_public_addresses_and_never_prints_it(engr
     assert started["token"] is None and "No token" in res.output
     monkeypatch.setattr(srv, "make_server", lambda *a, **k: (_ for _ in ()).throw(ValueError("needs a token")))
     assert CliRunner().invoke(app, ["serve"]).exit_code == 1
+
+
+# -- engram ui: the web interface ---------------------------------------------
+
+@pytest.fixture
+def ui(engram_home):
+    server = _start(engram_home, ui=True)
+    yield server
+    server.shutdown()
+    server.server_close()
+
+
+def _raw(httpd, path, headers=None):
+    port = httpd.server_address[1]
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+    conn.request("GET", path, headers=headers or {})
+    resp = conn.getresponse()
+    body = resp.read().decode()
+    conn.close()
+    return resp, body
+
+
+def test_ui_page_is_self_contained_and_locked_down(ui):
+    resp, page = _raw(ui, "/")
+    assert resp.status == 200 and resp.getheader("Content-Type").startswith("text/html")
+    policy = resp.getheader("Content-Security-Policy")
+    assert "default-src 'none'" in policy and "connect-src 'self'" in policy and "unsafe-inline" not in policy
+    nonce = policy.split("script-src 'nonce-")[1].split("'")[0]
+    assert f'<script nonce="{nonce}">' in page and "{{NONCE}}" not in page
+    assert _raw(ui, "/")[0].getheader("Content-Security-Policy") != policy      # a fresh nonce each time
+    assert resp.getheader("X-Frame-Options") == "DENY"
+    # nothing is loaded from anywhere else, and no markup is built from memory text
+    import re
+    assert not re.search(r"""(src|href)\\s*=\\s*["']?(https?:)?//""", page)
+    assert "innerHTML" not in page and "onclick=" not in page and " style=" not in page
+
+
+def test_ui_is_only_served_when_asked_for_and_only_locally(httpd, ui, engram_home):
+    assert _req(httpd, "GET", "/")[0] == 404                      # plain `engram serve` has no page
+    assert _req(httpd, "GET", "/ui/overview")[0] == 404
+    assert _req(ui, "GET", "/ui/overview", host="evil.example")[0] == 403
+    assert _req(ui, "GET", "/ui/overview", headers={"Origin": "http://evil.example"})[0] == 403
+    assert _req(ui, "GET", "/cli.py")[0] == 404                   # the page, not the folder it lives in
+    with pytest.raises(ValueError):
+        srv.make_server("0.0.0.0", 0, "token", ui=True)
+    with pytest.raises(ValueError):
+        srv.make_server("127.0.0.1", 0, "token", ui=True)
+
+
+def test_ui_overview_and_room(ui):
+    add = lambda **kw: _req(ui, "POST", "/v1/tools/engram_add_memory", kw)[1]["result"]  # noqa: E731
+    old = add(content="We use SQLite for sessions.", wing="app", room="storage")
+    add(content="Deploys happen on Fridays.", wing="app", room="deploys", pinned=True)
+    _req(ui, "POST", "/v1/tools/engram_correct", {"memory_id": old["id"], "content": "We use PostgreSQL for sessions."})
+    status, data, _ = _req(ui, "GET", "/ui/overview")
+    assert status == 200
+    assert data["totals"] == {"wings": 1, "rooms": 2, "memories": 3, "pinned": 1, "superseded": 1, "disputed": 0}
+    assert [r["name"] for r in data["wings"][0]["rooms"]] == ["storage", "deploys"]
+    assert data["activity"][-1]["count"] == 3 and len(data["recent"]) == 3
+    status, room, _ = _req(ui, "GET", "/ui/room?wing=app&room=storage")
+    assert status == 200 and room["total"] == 2
+    assert {m["status"] for m in room["memories"]} == {"current", "superseded"}
+    assert _req(ui, "GET", "/ui/room?wing=..&room=storage")[0] == 400
+    assert _req(ui, "GET", "/ui/room?wing=app")[0] == 400

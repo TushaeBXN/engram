@@ -6,11 +6,11 @@ Data is persisted under ~/.engram/chroma_db/.
 
 from __future__ import annotations
 
-import threading
 from pathlib import Path
 from typing import Any
 
 from engram.backends.base import VectorBackend
+from engram.locking import StoreLock
 
 
 class ChromaDBBackend(VectorBackend):
@@ -39,16 +39,21 @@ class ChromaDBBackend(VectorBackend):
         self._persist_dir = str(Path(persist_directory).expanduser())
         Path(self._persist_dir).mkdir(parents=True, exist_ok=True)
 
-        self._lock = threading.Lock()  # guards all _col / _client calls (Rust FFI is not thread-safe)
-        self._client = chromadb.PersistentClient(path=self._persist_dir)
-        self._col = self._client.get_or_create_collection(
-            name=collection_name,
-            metadata={"hnsw:space": "cosine"},
-            embedding_function=(embedding.chroma_function(server) if server
-                                else _cached_default_embedding_function()),
-        )
+        # One writer at a time, across threads and processes (see engram.locking):
+        # the Rust bindings are not thread-safe, and several Engram processes
+        # (MCP server, hooks, `engram mine`) share this folder.
+        self._lock = StoreLock(Path(self._persist_dir) / ".engram.lock")
+        self._warned = False
+        with self._lock:
+            self._client = chromadb.PersistentClient(path=self._persist_dir)
+            self._col = self._client.get_or_create_collection(
+                name=collection_name,
+                metadata={"hnsw:space": "cosine"},
+                embedding_function=(embedding.chroma_function(server) if server
+                                    else _cached_default_embedding_function()),
+            )
         self.embedding_server = server
-        if server and self._col.count() == 0:
+        if server and self.count() == 0:
             import sys
             print(f"engram: using the embedding server at {server['url']} ({server['model']}); its index is "
                   "empty. Run `engram reindex` to fill it from your memories.", file=sys.stderr)
@@ -70,21 +75,21 @@ class ChromaDBBackend(VectorBackend):
                 )
 
     def search(self, query: str, n: int = 10, where: dict | None = None) -> list[dict]:
-        with self._lock:
-            count = self._col.count()
-            kwargs: dict[str, Any] = {
-                "query_texts": [query],
-                "n_results": min(n, max(1, count)),
-                "include": ["documents", "metadatas", "distances"],
-            }
-            if where:
-                kwargs["where"] = _chroma_where(where)
+        with self._lock.shared():
             try:
+                kwargs: dict[str, Any] = {
+                    "query_texts": [query],
+                    "n_results": min(n, max(1, self._col.count())),
+                    "include": ["documents", "metadatas", "distances"],
+                }
+                if where:
+                    kwargs["where"] = _chroma_where(where)
                 res = self._col.query(**kwargs)
             except Exception as exc:
                 from engram.embedding import EmbeddingConfigError
                 if isinstance(exc, EmbeddingConfigError):
                     raise  # an embedding server that is down must not look like "no results"
+                self._warn(exc)
                 return []
 
         results = []
@@ -130,10 +135,22 @@ class ChromaDBBackend(VectorBackend):
 
     def count(self) -> int:
         try:
-            with self._lock:
+            with self._lock.shared():
                 return self._col.count()
-        except Exception:
+        except Exception as exc:
+            self._warn(exc)
             return 0
+
+    def _warn(self, exc: Exception) -> None:
+        """Say once that the index could not be read. The memories themselves
+        are files in the château and are unaffected; keyword search still
+        answers, and `engram reindex` rebuilds this index from them."""
+        if not self._warned:
+            self._warned = True
+            import sys
+            print(f"engram: the meaning-search index could not be read ({type(exc).__name__}); results come "
+                  "from keyword search only. Your memories are safe: run `engram reindex` to rebuild the index.",
+                  file=sys.stderr)
 
     def update(self, id: str, text: str, metadata: dict) -> None:
         with self._lock:

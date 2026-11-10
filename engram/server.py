@@ -8,6 +8,9 @@
     GET  /v1/tools               the tool names
     POST /v1/tools/<name>        body = the tool's arguments; reply {"result": ...}
 
+``engram ui`` runs the same server with the web interface added: ``GET /``
+is the page, ``GET /ui/overview`` and ``GET /ui/room`` feed it (read-only).
+
 Because memories are private, the defaults are strict:
 
 * It listens on ``127.0.0.1`` only. Listening on any other address requires a
@@ -43,7 +46,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Optional
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 from engram import __version__, config
 
@@ -156,8 +159,9 @@ def openapi(tools: list[dict], with_token: bool) -> dict:
 class EngramHTTPServer(ThreadingHTTPServer):
     daemon_threads = True
 
-    def __init__(self, address, engram, token: Optional[str], extra_hosts: tuple = ()) -> None:
+    def __init__(self, address, engram, token: Optional[str], extra_hosts: tuple = (), ui: bool = False) -> None:
         self.engram = engram              # an EngramMCPServer
+        self.ui = ui                      # also serve the web interface (engram ui)
         self.token = token
         self.extra_hosts = tuple(h.lower() for h in extra_hosts)
         self.lock = threading.Lock()      # the vector backends aren't safe to share across threads
@@ -229,8 +233,62 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(200, openapi(TOOLS, bool(self.server.token)))
         elif path == "/v1/tools":
             self._send(200, {"tools": [t["name"] for t in TOOLS]})
+        elif self.server.ui and path == "/":
+            self._send_page()
+        elif self.server.ui and path in ("/ui/overview", "/ui/room"):
+            self._ui_data(path)
         else:
             self._send(404, {"error": "not found"})
+
+    # -- web interface (engram ui) ------------------------------------------
+
+    def _send_page(self) -> None:
+        """The interface: one self-contained page that loads nothing from anywhere else.
+
+        The policy below lets the page run only the script and styles this
+        response carries (a fresh nonce each time) and talk only to this
+        server, so even text inside a memory could not make it run code or
+        send anything out.
+        """
+        nonce = secrets.token_urlsafe(18)
+        try:
+            page = (Path(__file__).parent / "ui.html").read_text(encoding="utf-8")
+        except OSError:
+            self._send(500, {"error": "the interface file is missing from this install"})
+            return
+        body = page.replace("{{NONCE}}", nonce).replace("{{VERSION}}", __version__).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Security-Policy",
+                         f"default-src 'none'; script-src 'nonce-{nonce}'; style-src 'nonce-{nonce}'; "
+                         "connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; "
+                         "frame-ancestors 'none'")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _ui_data(self, path: str) -> None:
+        from engram import ui_data
+        from engram.chateau import InvalidNameError, validate_name
+        query = parse_qs(urlsplit(self.path).query)
+        try:
+            with self.server.lock:
+                palace = self.server.engram.palace
+                if path == "/ui/overview":
+                    result = ui_data.overview(palace)
+                else:
+                    wing = validate_name((query.get("wing") or [""])[0], "wing")
+                    name = validate_name((query.get("room") or [""])[0], "room")
+                    result = ui_data.room(palace, wing, name)
+            self._send(200, result)
+        except InvalidNameError as exc:
+            self._send(400, {"error": str(exc)})
+        except Exception as exc:  # name the class only: messages can hold paths
+            self._send(500, {"error": f"internal error ({type(exc).__name__})"})
 
     def do_POST(self):
         if not self._guard():
@@ -264,11 +322,17 @@ class _Handler(BaseHTTPRequestHandler):
 
 
 def make_server(host: str = "127.0.0.1", port: int = DEFAULT_PORT, token: Optional[str] = None,
-                engram=None, extra_hosts: tuple = ()) -> EngramHTTPServer:
-    """Build the server. A non-loopback *host* without a *token* is refused."""
+                engram=None, extra_hosts: tuple = (), ui: bool = False) -> EngramHTTPServer:
+    """Build the server. A non-loopback *host* without a *token* is refused.
+
+    With *ui* the server also serves the web interface at ``/``. The page has
+    nowhere to keep a token, so the interface is for this computer only.
+    """
+    if ui and (token or not is_loopback(host)):
+        raise ValueError("the web interface is served on localhost only, without a token")
     if not is_loopback(host) and not token:
         raise ValueError(f"listening on {host} needs a token (this address is reachable from other machines)")
     if engram is None:
         from engram.mcp_server import EngramMCPServer
         engram = EngramMCPServer()
-    return EngramHTTPServer((host, port), engram, token, extra_hosts)
+    return EngramHTTPServer((host, port), engram, token, extra_hosts, ui=ui)
