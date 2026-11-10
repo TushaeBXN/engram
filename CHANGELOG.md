@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.11.0
 
 **`engram ui` now shows your real memory.** The page used to be a separate notes
 app that kept its notes in the browser and never looked at `~/.engram/`. It is
