@@ -46,7 +46,7 @@ def backend(tmp_path, monkeypatch):
     monkeypatch.setattr(chromadb_backend, "_cached_default_embedding_function", lambda: _TinyEmbedding())
     monkeypatch.setattr("engram.embedding.settings", lambda cfg: None)
     b = chromadb_backend.ChromaDBBackend(collection_name="reconnect-test", persist_directory=tmp_path / "chroma")
-    b.add("m1", "Brian sent a photo", {"wing": "amy"})
+    b.add("m1", "a photo arrived", {"wing": "notes"})
     yield b
     SharedSystemClient.clear_system_cache()
 
@@ -66,9 +66,9 @@ def test_count_and_writes_reopen_too(backend):
     backend._col = _StaleCollection()
     assert backend.count() == 1
     backend._col = _StaleCollection()
-    backend.add("m2", "a second memory", {"wing": "amy"})
+    backend.add("m2", "a second memory", {"wing": "notes"})
     backend._col = _StaleCollection()
-    backend.update("m2", "a second memory, edited", {"wing": "amy"})
+    backend.update("m2", "a second memory, edited", {"wing": "notes"})
     backend._col = _StaleCollection()
     backend.delete("m1")
     assert backend.count() == 1
