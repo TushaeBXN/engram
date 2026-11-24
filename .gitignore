@@ -45,3 +45,6 @@ chroma_db/
 
 # Logs
 *.log
+
+# Benchmark output (benchmarks/*_bench.py --out ...), written to the repo root
+/*.jsonl
