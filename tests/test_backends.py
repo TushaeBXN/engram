@@ -11,10 +11,24 @@ from engram.backends import BackendUnavailableError, get_backend
 @pytest.fixture
 def broken_chromadb(monkeypatch):
     """Simulate chromadb's Rust bindings failing to load."""
+    def is_chroma(name):
+        return name == "chromadb" or name.startswith("chromadb.")
+
+    loaded = {name for name in sys.modules if is_chroma(name)}
     monkeypatch.setitem(sys.modules, "chromadb_rust_bindings", None)
-    for name in list(sys.modules):
-        if name == "chromadb" or name.startswith("chromadb."):
-            monkeypatch.delitem(sys.modules, name)
+    for name in loaded:
+        monkeypatch.delitem(sys.modules, name)
+    yield
+    # monkeypatch puts the original modules back, but the failed import also
+    # left half-built chromadb submodules that were never loaded before. Drop
+    # them, or later tests that use the real chromadb import a mix of the two.
+    for name in [n for n in sys.modules if is_chroma(n) and n not in loaded]:
+        del sys.modules[name]
+    # typing also cached the half-built copy's recursive type aliases (chromadb's
+    # Where filters); comparing those with the real ones recurses forever.
+    import typing
+    for clear in getattr(typing, "_cleanups", []):
+        clear()
 
 
 def test_broken_chromadb_raises_actionable_error(broken_chromadb, tmp_path):

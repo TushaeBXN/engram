@@ -44,14 +44,10 @@ class ChromaDBBackend(VectorBackend):
         # (MCP server, hooks, `engram mine`) share this folder.
         self._lock = StoreLock(Path(self._persist_dir) / ".engram.lock")
         self._warned = False
+        self._embedding_function = (embedding.chroma_function(server) if server
+                                    else _cached_default_embedding_function())
         with self._lock:
-            self._client = chromadb.PersistentClient(path=self._persist_dir)
-            self._col = self._client.get_or_create_collection(
-                name=collection_name,
-                metadata={"hnsw:space": "cosine"},
-                embedding_function=(embedding.chroma_function(server) if server
-                                    else _cached_default_embedding_function()),
-            )
+            self._connect()
         self.embedding_server = server
         if server and self.count() == 0:
             import sys
@@ -60,37 +56,94 @@ class ChromaDBBackend(VectorBackend):
 
     # ------------------------------------------------------------------
 
-    def add(self, id: str, text: str, metadata: dict) -> None:
+    def _connect(self) -> None:
+        """Open the client and collection. Call with the lock held."""
+        import chromadb
+
+        self._client = chromadb.PersistentClient(path=self._persist_dir)
+        self._col = self._client.get_or_create_collection(
+            name=self._collection_name,
+            metadata={"hnsw:space": "cosine"},
+            embedding_function=self._embedding_function,
+        )
+
+    def _reconnect(self) -> bool:
+        """Throw away this process's open index and open it again from disk.
+
+        ChromaDB keeps one shared System per folder for the life of the
+        process. In a long-running process (Amy, the MCP server) that System
+        can go stale while other processes write to the folder, and from then
+        on every read raises InternalError, though the files on disk are fine
+        and a fresh process reads them. Opening a new client is not enough,
+        because it is handed the same cached System, so that cache entry is
+        dropped first. Another backend in this process on the same folder keeps
+        the old handle until its own next error, when it reconnects the same way.
+        """
+        from chromadb.api.shared_system_client import SharedSystemClient
+
         with self._lock:
-            self._col.upsert(ids=[id], documents=[text], metadatas=[_sanitise(metadata)])
+            ident = getattr(self._client, "_identifier", None)
+            old = SharedSystemClient._identifier_to_system.pop(ident, None) if ident else None
+            SharedSystemClient._identifier_to_refcount.pop(ident, None)
+            if old is not None:
+                try:
+                    old.stop()
+                except Exception:
+                    pass
+            try:
+                self._connect()
+            except Exception as exc:
+                self._warn(exc)
+                return False
+        return True
+
+    def _run(self, op, *, shared: bool = False):
+        """Run ``op()`` under the lock. After a ChromaDB error, reconnect and
+        try once more; a second failure, or any other error, is raised. A bad
+        argument is the caller's mistake, not a stale index, so it is raised
+        at once."""
+        from chromadb.errors import ChromaError, InvalidArgumentError
+
+        for attempt in (0, 1):
+            try:
+                with (self._lock.shared() if shared else self._lock):
+                    return op()
+            except ChromaError as exc:
+                if attempt or isinstance(exc, InvalidArgumentError) or not self._reconnect():
+                    raise
+        raise AssertionError("unreachable")
+
+    def add(self, id: str, text: str, metadata: dict) -> None:
+        self._run(lambda: self._col.upsert(ids=[id], documents=[text], metadatas=[_sanitise(metadata)]))
 
     def add_many(self, items: list[tuple[str, str, dict]]) -> None:
         for start in range(0, len(items), _BATCH):
             batch = items[start:start + _BATCH]
-            with self._lock:
-                self._col.upsert(
-                    ids=[i for i, _, _ in batch],
-                    documents=[t for _, t, _ in batch],
-                    metadatas=[_sanitise(m) for _, _, m in batch],
-                )
+            self._run(lambda: self._col.upsert(
+                ids=[i for i, _, _ in batch],
+                documents=[t for _, t, _ in batch],
+                metadatas=[_sanitise(m) for _, _, m in batch],
+            ))
 
     def search(self, query: str, n: int = 10, where: dict | None = None) -> list[dict]:
-        with self._lock.shared():
-            try:
-                kwargs: dict[str, Any] = {
-                    "query_texts": [query],
-                    "n_results": min(n, max(1, self._col.count())),
-                    "include": ["documents", "metadatas", "distances"],
-                }
-                if where:
-                    kwargs["where"] = _chroma_where(where)
-                res = self._col.query(**kwargs)
-            except Exception as exc:
-                from engram.embedding import EmbeddingConfigError
-                if isinstance(exc, EmbeddingConfigError):
-                    raise  # an embedding server that is down must not look like "no results"
-                self._warn(exc)
-                return []
+        def query_index():
+            kwargs: dict[str, Any] = {
+                "query_texts": [query],
+                "n_results": min(n, max(1, self._col.count())),
+                "include": ["documents", "metadatas", "distances"],
+            }
+            if where:
+                kwargs["where"] = _chroma_where(where)
+            return self._col.query(**kwargs)
+
+        try:
+            res = self._run(query_index, shared=True)
+        except Exception as exc:
+            from engram.embedding import EmbeddingConfigError
+            if isinstance(exc, EmbeddingConfigError):
+                raise  # an embedding server that is down must not look like "no results"
+            self._warn(exc)
+            return []
 
         results = []
         ids = res.get("ids", [[]])[0]
@@ -110,15 +163,13 @@ class ChromaDBBackend(VectorBackend):
 
     def delete_where(self, where: dict) -> None:
         try:
-            with self._lock:
-                self._col.delete(where=_chroma_where(where))
+            self._run(lambda: self._col.delete(where=_chroma_where(where)))
         except Exception:
             pass
 
     def delete(self, id: str) -> None:
         try:
-            with self._lock:
-                self._col.delete(ids=[id])
+            self._run(lambda: self._col.delete(ids=[id]))
         except Exception:
             pass
 
@@ -135,26 +186,25 @@ class ChromaDBBackend(VectorBackend):
 
     def count(self) -> int:
         try:
-            with self._lock.shared():
-                return self._col.count()
+            return self._run(lambda: self._col.count(), shared=True)
         except Exception as exc:
             self._warn(exc)
             return 0
 
     def _warn(self, exc: Exception) -> None:
-        """Say once that the index could not be read. The memories themselves
-        are files in the château and are unaffected; keyword search still
-        answers, and `engram reindex` rebuilds this index from them."""
+        """Say once that the index could not be read, even after reopening it.
+        The memories themselves are files in the château and are unaffected;
+        keyword search still answers, and `engram reindex` rebuilds this index
+        from them."""
         if not self._warned:
             self._warned = True
             import sys
-            print(f"engram: the meaning-search index could not be read ({type(exc).__name__}); results come "
-                  "from keyword search only. Your memories are safe: run `engram reindex` to rebuild the index.",
-                  file=sys.stderr)
+            print(f"engram: the meaning-search index could not be read ({type(exc).__name__}), even after "
+                  "reopening it; results come from keyword search only. Your memories are safe: run "
+                  "`engram reindex` to rebuild the index.", file=sys.stderr)
 
     def update(self, id: str, text: str, metadata: dict) -> None:
-        with self._lock:
-            self._col.update(ids=[id], documents=[text], metadatas=[_sanitise(metadata)])
+        self._run(lambda: self._col.update(ids=[id], documents=[text], metadatas=[_sanitise(metadata)]))
 
 
 # ---------------------------------------------------------------------------
